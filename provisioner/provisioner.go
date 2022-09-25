@@ -11,8 +11,18 @@ type Manager struct {
 	Provider Provider
 }
 
-func New() *Manager {
-	return &Manager{Provider: &Gitlab{}}
+func (m *Manager) Create(ctx context.Context) error {
+	return m.Provider.Create(ctx)
+}
+
+func (m *Manager) Destroy(ctx context.Context) error {
+	return m.Provider.Destroy(ctx)
+}
+
+func New(config *Config) *Manager {
+	return &Manager{Provider: &Gitlab{
+		config: config,
+	}}
 }
 
 func WithProvider(provider Provider) *Manager {

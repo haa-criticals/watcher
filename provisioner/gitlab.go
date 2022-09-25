@@ -10,10 +10,16 @@ import (
 	"net/url"
 )
 
+type Config struct {
+	BaseUrl   string
+	Token     string
+	ProjectId int64
+	Ref       string
+	Variables map[string]string
+}
+
 type Gitlab struct {
-	url       string
-	projectId int64
-	variables map[string]string
+	config *Config
 }
 
 func (g *Gitlab) Create(ctx context.Context) error {
@@ -24,12 +30,12 @@ func (g *Gitlab) Create(ctx context.Context) error {
 
 func (g *Gitlab) buildValues() url.Values {
 	values := url.Values{
-		"ref":   {"master"},
-		"token": {"token"},
+		"ref":   {g.config.Ref},
+		"token": {g.config.Token},
 	}
 
-	for k, v := range g.variables {
-		values.Add(fmt.Sprintf("variables[%s]", k), v)
+	for k, v := range g.config.Variables {
+		values.Add(fmt.Sprintf("Variables[%s]", k), v)
 	}
 	return values
 }
@@ -41,7 +47,7 @@ func (g *Gitlab) Destroy(ctx context.Context) error {
 }
 
 func (g *Gitlab) doRequest(ctx context.Context, values url.Values) error {
-	endPoint := fmt.Sprintf("%s/api/v4/projects/%d/trigger/pipeline", g.url, g.projectId)
+	endPoint := fmt.Sprintf("%s/api/v4/projects/%d/trigger/pipeline", g.config.BaseUrl, g.config.ProjectId)
 	req, err := http.NewRequestWithContext(ctx, "POST", endPoint, bytes.NewBufferString(values.Encode()))
 	if err != nil {
 		return err
