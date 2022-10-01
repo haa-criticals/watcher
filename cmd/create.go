@@ -1,7 +1,8 @@
 package cmd
 
 import (
-	"fmt"
+	"github.com.haa-criticals/watcher/provisioner"
+	"log"
 
 	"github.com/spf13/cobra"
 )
@@ -17,7 +18,17 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("create called")
+		log.Println("creating infraestructure")
+		m := provisioner.New(&provisioner.Config{
+			BaseUrl:   baseUrl,
+			Token:     token,
+			ProjectId: projectId,
+			Ref:       projectRef,
+			Variables: variables,
+		})
+		if err := m.Create(cmd.Context()); err != nil {
+			log.Println(err)
+		}
 	},
 }
 
@@ -32,5 +43,5 @@ func init() {
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
-	// createCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+
 }

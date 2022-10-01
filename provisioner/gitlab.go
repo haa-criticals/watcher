@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 type Config struct {
@@ -24,7 +25,7 @@ type Gitlab struct {
 
 func (g *Gitlab) Create(ctx context.Context) error {
 	values := g.buildValues()
-	values.Add("ACTION", "create")
+	values.Add("variables[ACTION]", "create")
 	return g.doRequest(ctx, values)
 }
 
@@ -35,19 +36,19 @@ func (g *Gitlab) buildValues() url.Values {
 	}
 
 	for k, v := range g.config.Variables {
-		values.Add(fmt.Sprintf("Variables[%s]", k), v)
+		values.Add(fmt.Sprintf("variables[%s]", k), v)
 	}
 	return values
 }
 
 func (g *Gitlab) Destroy(ctx context.Context) error {
 	values := g.buildValues()
-	values.Add("ACTION", "destroy")
+	values.Add("variables[ACTION]", "destroy")
 	return g.doRequest(ctx, values)
 }
 
 func (g *Gitlab) doRequest(ctx context.Context, values url.Values) error {
-	endPoint := fmt.Sprintf("%s/api/v4/projects/%d/trigger/pipeline", g.config.BaseUrl, g.config.ProjectId)
+	endPoint := fmt.Sprintf("%s/api/v4/projects/%d/trigger/pipeline", strings.TrimRight(g.config.BaseUrl, "/"), g.config.ProjectId)
 	req, err := http.NewRequestWithContext(ctx, "POST", endPoint, bytes.NewBufferString(values.Encode()))
 	if err != nil {
 		return err
