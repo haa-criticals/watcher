@@ -25,6 +25,7 @@ to quickly create a Cobra application.`,
 			ProjectId: projectId,
 			Ref:       projectRef,
 			Variables: variables,
+			Watch:     watch,
 		})
 		if err := m.Create(cmd.Context()); err != nil {
 			log.Println(err)
@@ -43,5 +44,6 @@ func init() {
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
+	createCmd.Flags().BoolVar(&watch, "watch", false, "watch for progress")
 
 }

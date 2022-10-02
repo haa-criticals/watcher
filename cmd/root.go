@@ -11,6 +11,7 @@ import (
 
 var (
 	cfgFile    string
+	watch      bool
 	provider   string
 	baseUrl    string
 	token      string
