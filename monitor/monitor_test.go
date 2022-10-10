@@ -11,7 +11,7 @@ func TestRegisterWatcher(t *testing.T) {
 	t.Run("Should register watchers", func(t *testing.T) {
 		m := New()
 		assert.Len(t, m.watchers, 0)
-		m.RegisterWatcher(&Watcher{})
+		m.RegisterWatcher(nil, &Watcher{})
 		assert.Len(t, m.watchers, 1)
 	})
 }

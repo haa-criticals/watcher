@@ -1,5 +1,5 @@
-pwd:
-	echo $(PWD)
+proto:
+	protoc -I=./app/proto  --go_out=./app/grpc/pb --go_opt=paths=source_relative --go-grpc_out=./app/grpc/pb --go-grpc_opt=paths=source_relative  ./app/proto/*.proto
 
 build:
 	go build -o dist/watcher .

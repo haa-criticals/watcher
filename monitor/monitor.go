@@ -1,6 +1,7 @@
 package monitor
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"sync"
@@ -41,7 +42,7 @@ func (m *Monitor) sendBeatToWatcher(wg *sync.WaitGroup, watcher *Watcher) {
 	}
 }
 
-func (m *Monitor) RegisterWatcher(watcher *Watcher) {
+func (m *Monitor) RegisterWatcher(ctx context.Context, watcher *Watcher) {
 	m.watchers = append(m.watchers, watcher)
 }
 

@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package pb;
+
+option go_package = "github.com/haa-criticals/watcher/app/grpc/pb";
+
+message RegisterRequest {
+    string address = 1;
+    string key = 2;
+}
+
+message RegisterResponse {
+    bool success = 1;
+    repeated string nodes = 2;
+}
+
+service Watcher {
+    rpc Register(RegisterRequest) returns (RegisterResponse) {}
+}
