@@ -1,6 +1,7 @@
 package monitor
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -26,7 +27,7 @@ func TestHeartBeat(t *testing.T) {
 		start := time.Now()
 
 		m := New(&defaultNotifier{})
-		m.ErrorHandler = func(err error, watcher *Watcher) {
+		m.HeartBeatErrorHandler = func(err error, watcher *Watcher) {
 			t.Fatalf("error sending heart Beat to %s: %v", watcher.BaseURL, err)
 		}
 
@@ -57,7 +58,7 @@ func TestHeartBeat(t *testing.T) {
 	t.Run("Should call error handler if there is an error sending heart Beat", func(t *testing.T) {
 		m := New(&defaultNotifier{})
 		var receivedError error
-		m.ErrorHandler = func(err error, watcher *Watcher) {
+		m.HeartBeatErrorHandler = func(err error, watcher *Watcher) {
 			receivedError = err
 		}
 
@@ -77,7 +78,7 @@ func TestHeartBeat(t *testing.T) {
 		endpoint2.start()
 
 		m := New(&defaultNotifier{})
-		m.ErrorHandler = func(err error, watcher *Watcher) {
+		m.HeartBeatErrorHandler = func(err error, watcher *Watcher) {
 			t.Fatalf("error sending heart Beat to %s: %v", watcher.BaseURL, err)
 		}
 
@@ -86,7 +87,7 @@ func TestHeartBeat(t *testing.T) {
 			{BaseURL: endpoint2.baseURL()},
 		}
 
-		go m.StartHeartBeat(time.Second)
+		go m.StartHeartBeating(time.Second)
 		time.Sleep(5 * time.Second)
 		m.StopHeartBeat()
 		assert.Equal(t, 5, endpoint1.beatCount)
@@ -94,5 +95,32 @@ func TestHeartBeat(t *testing.T) {
 		endpoint1.stop()
 		endpoint2.stop()
 
+	})
+}
+
+func TestHealthCheck(t *testing.T) {
+	t.Run("Should return true if the endpoint is alive", func(t *testing.T) {
+		endpoint1 := &mockEndpoint{}
+		endpoint1.start()
+
+		m := New(&defaultNotifier{})
+
+		err := m.healthCheck(fmt.Sprintf("%s/healthz", endpoint1.baseURL()))
+		assert.NoError(t, err)
+		endpoint1.stop()
+	})
+
+	t.Run("Should return false if any watcher is dead", func(t *testing.T) {
+		endpoint1 := &mockEndpoint{}
+		endpoint1.start()
+
+		m := New(&defaultNotifier{})
+		healthEndpoint := fmt.Sprintf("%s/healthz", endpoint1.baseURL())
+
+		err := m.healthCheck(healthEndpoint)
+		assert.NoError(t, err)
+		endpoint1.stop()
+		err = m.healthCheck(healthEndpoint)
+		assert.Error(t, err)
 	})
 }

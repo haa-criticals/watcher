@@ -2,7 +2,9 @@ package monitor
 
 import (
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"sync"
 	"time"
 )
@@ -12,13 +14,17 @@ type Watcher struct {
 }
 
 type Monitor struct {
-	notifier     Notifier
-	watchers     []*Watcher
-	ErrorHandler func(error, *Watcher)
-	done         chan struct{}
+	notifier              Notifier
+	watchers              []*Watcher
+	HeartBeatErrorHandler func(error, *Watcher)
+	done                  chan struct{}
 }
 
-func (m *Monitor) StartHeartBeat(period time.Duration) {
+func (m *Monitor) RegisterWatcher(watcher *Watcher) {
+	m.watchers = append(m.watchers, watcher)
+}
+
+func (m *Monitor) StartHeartBeating(period time.Duration) {
 	t := time.NewTicker(period)
 	for {
 		select {
@@ -57,14 +63,34 @@ func (m *Monitor) sendBeatToWatcher(wg *sync.WaitGroup, watcher *Watcher) {
 	err := m.notifier.Beat(watcher.BaseURL)
 	if err != nil {
 		log.Printf("error sending heart Beat to %s: %v", watcher.BaseURL, err)
-		if m.ErrorHandler != nil {
-			m.ErrorHandler(err, watcher)
+		if m.HeartBeatErrorHandler != nil {
+			m.HeartBeatErrorHandler(err, watcher)
 		}
 	}
 }
 
-func (m *Monitor) RegisterWatcher(watcher *Watcher) {
-	m.watchers = append(m.watchers, watcher)
+func (m *Monitor) healthCheck(endpoint string) error {
+	r, err := http.NewRequest("GET", endpoint, nil)
+	if err != nil {
+		return err
+	}
+	res, err := http.DefaultClient.Do(r)
+
+	if err != nil {
+		return err
+	}
+
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Printf("error closing response body: %v", err)
+		}
+	}(res.Body)
+
+	if res.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code: %d", res.StatusCode)
+	}
+	return nil
 }
 
 func New(notifier Notifier) *Monitor {

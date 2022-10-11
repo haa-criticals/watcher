@@ -27,6 +27,13 @@ func (m *mockEndpoint) start() {
 			log.Println(err)
 		}
 	})
+	mux.HandleFunc("/healthz", func(writer http.ResponseWriter, request *http.Request) {
+		writer.WriteHeader(http.StatusOK)
+		_, err := writer.Write([]byte("ok"))
+		if err != nil {
+			log.Println(err)
+		}
+	})
 	m.server = httptest.NewServer(mux)
 }
 
