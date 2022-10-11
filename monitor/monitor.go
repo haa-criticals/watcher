@@ -40,10 +40,6 @@ func (m *Monitor) StartHeartBeating(period time.Duration) {
 	}
 }
 
-func (m *Monitor) StopHeartBeat() {
-	m.done <- struct{}{}
-}
-
 func (m *Monitor) heartBeat() error {
 	if len(m.watchers) == 0 {
 		return fmt.Errorf("no watchers registered")
@@ -65,6 +61,22 @@ func (m *Monitor) sendBeatToWatcher(wg *sync.WaitGroup, watcher *Watcher) {
 		log.Printf("error sending heart Beat to %s: %v", watcher.BaseURL, err)
 		if m.HeartBeatErrorHandler != nil {
 			m.HeartBeatErrorHandler(err, watcher)
+		}
+	}
+}
+
+func (m *Monitor) StartHealthChecks(second time.Duration, endpoint string) {
+	t := time.NewTicker(second)
+	for {
+		select {
+		case <-t.C:
+			err := m.healthCheck(endpoint)
+			if err != nil {
+				log.Printf("error sending health check: %v", err)
+			}
+		case <-m.done:
+			t.Stop()
+			return
 		}
 	}
 }
@@ -91,6 +103,10 @@ func (m *Monitor) healthCheck(endpoint string) error {
 		return fmt.Errorf("unexpected status code: %d", res.StatusCode)
 	}
 	return nil
+}
+
+func (m *Monitor) Stop() {
+	close(m.done)
 }
 
 func New(notifier Notifier) *Monitor {

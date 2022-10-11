@@ -71,7 +71,7 @@ func TestHeartBeat(t *testing.T) {
 		assert.NotNil(t, receivedError)
 	})
 
-	t.Run("should send 5 heart Beats to all watchers in 5 secs", func(t *testing.T) {
+	t.Run("should send at least 5 heart Beats to all watchers in 6 secs", func(t *testing.T) {
 		endpoint1 := &mockEndpoint{}
 		endpoint2 := &mockEndpoint{}
 		endpoint1.start()
@@ -88,12 +88,10 @@ func TestHeartBeat(t *testing.T) {
 		}
 
 		go m.StartHeartBeating(time.Second)
-		time.Sleep(5 * time.Second)
-		m.StopHeartBeat()
-		assert.Equal(t, 5, endpoint1.beatCount)
-		assert.Equal(t, 5, endpoint2.beatCount)
-		endpoint1.stop()
-		endpoint2.stop()
+		time.Sleep(6 * time.Second)
+		m.Stop()
+		assert.GreaterOrEqual(t, endpoint1.beatCount, 5)
+		assert.GreaterOrEqual(t, endpoint2.beatCount, 5)
 
 	})
 }
@@ -110,7 +108,7 @@ func TestHealthCheck(t *testing.T) {
 		endpoint1.stop()
 	})
 
-	t.Run("Should return false if any watcher is dead", func(t *testing.T) {
+	t.Run("Should return error the endpoint is dead", func(t *testing.T) {
 		endpoint1 := &mockEndpoint{}
 		endpoint1.start()
 
@@ -122,5 +120,43 @@ func TestHealthCheck(t *testing.T) {
 		endpoint1.stop()
 		err = m.healthCheck(healthEndpoint)
 		assert.Error(t, err)
+	})
+
+	t.Run("Should send at least 5 health checks in 6 secs", func(t *testing.T) {
+		endpoint1 := &mockEndpoint{}
+		endpoint1.start()
+
+		m := New(&defaultNotifier{})
+
+		go m.StartHealthChecks(time.Second, fmt.Sprintf("%s/healthz", endpoint1.baseURL()))
+		time.Sleep(6 * time.Second)
+		m.Stop()
+		assert.GreaterOrEqual(t, endpoint1.healthCheckCount, 5)
+
+	})
+}
+
+func TestMonitor(t *testing.T) {
+	t.Run("Should send at most 2 heart beats and 2 health checks in 2 secs", func(t *testing.T) {
+		endpoint1 := &mockEndpoint{}
+		endpoint1.start()
+
+		m := New(&defaultNotifier{})
+		m.HeartBeatErrorHandler = func(err error, watcher *Watcher) {
+			t.Fatalf("error sending heart Beat to %s: %v", watcher.BaseURL, err)
+		}
+
+		m.RegisterWatcher(&Watcher{
+			BaseURL: fmt.Sprintf(endpoint1.baseURL()),
+		})
+
+		go m.StartHeartBeating(time.Second)
+		go m.StartHealthChecks(time.Second, fmt.Sprintf("%s/healthz", endpoint1.baseURL()))
+		time.Sleep(2 * time.Second)
+		m.Stop()
+		time.Sleep(3 * time.Second)
+		assert.LessOrEqual(t, endpoint1.healthCheckCount, 2)
+		assert.LessOrEqual(t, endpoint1.beatCount, 2)
+
 	})
 }
