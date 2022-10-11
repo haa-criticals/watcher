@@ -1,16 +1,19 @@
 package monitor
 
-import "net/http"
+import (
+	"fmt"
+	"net/http"
+)
 
 type Notifier interface {
-	beat(endpoint string) error
+	Beat(watcherAddress string) error
 }
 
 type defaultNotifier struct {
 }
 
-func (n *defaultNotifier) beat(endpoint string) error {
-	r, err := http.NewRequest("POST", endpoint, nil)
+func (n *defaultNotifier) Beat(watcherAddress string) error {
+	r, err := http.NewRequest("POST", fmt.Sprintf("%s/monitor/Beat", watcherAddress), nil)
 	if err != nil {
 		return err
 	}

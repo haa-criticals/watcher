@@ -1,5 +1,8 @@
 syntax = "proto3";
 
+import  "google/protobuf/timestamp.proto";
+import  "google/protobuf/empty.proto";
+
 package pb;
 
 option go_package = "github.com/haa-criticals/watcher/app/grpc/pb";
@@ -11,9 +14,15 @@ message RegisterRequest {
 
 message RegisterResponse {
     bool success = 1;
-    repeated string nodes = 2;
+    string id = 2;
+    repeated string nodes = 3;
+}
+
+message Beat {
+    google.protobuf.Timestamp timestamp = 3;
 }
 
 service Watcher {
     rpc Register(RegisterRequest) returns (RegisterResponse) {}
+    rpc Heartbeat(Beat) returns (google.protobuf.Empty) {}
 }

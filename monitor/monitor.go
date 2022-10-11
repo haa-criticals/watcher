@@ -1,7 +1,6 @@
 package monitor
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"sync"
@@ -33,21 +32,21 @@ func (m *Monitor) heartBeat() error {
 
 func (m *Monitor) sendBeatToWatcher(wg *sync.WaitGroup, watcher *Watcher) {
 	defer wg.Done()
-	err := m.notifier.beat(fmt.Sprintf("%s/monitor/beat", watcher.BaseURL))
+	err := m.notifier.Beat(watcher.BaseURL)
 	if err != nil {
-		log.Printf("error sending heart beat to %s: %v", watcher.BaseURL, err)
+		log.Printf("error sending heart Beat to %s: %v", watcher.BaseURL, err)
 		if m.ErrorHandler != nil {
 			m.ErrorHandler(err, watcher)
 		}
 	}
 }
 
-func (m *Monitor) RegisterWatcher(ctx context.Context, watcher *Watcher) {
+func (m *Monitor) RegisterWatcher(watcher *Watcher) {
 	m.watchers = append(m.watchers, watcher)
 }
 
-func New() *Monitor {
+func New(notifier Notifier) *Monitor {
 	return &Monitor{
-		notifier: &defaultNotifier{},
+		notifier: notifier,
 	}
 }

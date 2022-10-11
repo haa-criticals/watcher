@@ -1,7 +1,6 @@
 package monitor
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -38,16 +37,16 @@ func (m *mockEndpoint) baseURL() string {
 }
 
 func TestBeat(t *testing.T) {
-	t.Run("Should send heart beat to endpoint", func(t *testing.T) {
+	t.Run("Should send heart Beat to endpoint", func(t *testing.T) {
 		m := &mockEndpoint{}
 		m.start()
 		n := &defaultNotifier{}
 		start := time.Now()
 
-		err := n.beat(fmt.Sprintf("%s/monitor/beat", m.baseURL()))
+		err := n.Beat(m.baseURL())
 		assert.NoError(t, err)
 		assert.NotNil(t, m.lastBeat)
-		assert.True(t, m.lastBeat.After(start), "last beat should be after start")
+		assert.True(t, m.lastBeat.After(start), "last Beat should be after start")
 		m.stop()
 	})
 }

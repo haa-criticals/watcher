@@ -9,15 +9,15 @@ import (
 
 func TestRegisterWatcher(t *testing.T) {
 	t.Run("Should register watchers", func(t *testing.T) {
-		m := New()
+		m := New(&defaultNotifier{})
 		assert.Len(t, m.watchers, 0)
-		m.RegisterWatcher(nil, &Watcher{})
+		m.RegisterWatcher(&Watcher{})
 		assert.Len(t, m.watchers, 1)
 	})
 }
 
 func TestHeartBeat(t *testing.T) {
-	t.Run("Should send heart beat to all watchers", func(t *testing.T) {
+	t.Run("Should send heart Beat to all watchers", func(t *testing.T) {
 		endpoint1 := &mockEndpoint{}
 		endpoint2 := &mockEndpoint{}
 		endpoint1.start()
@@ -25,9 +25,9 @@ func TestHeartBeat(t *testing.T) {
 
 		start := time.Now()
 
-		m := New()
+		m := New(&defaultNotifier{})
 		m.ErrorHandler = func(err error, watcher *Watcher) {
-			t.Fatalf("error sending heart beat to %s: %v", watcher.BaseURL, err)
+			t.Fatalf("error sending heart Beat to %s: %v", watcher.BaseURL, err)
 		}
 
 		m.watchers = []*Watcher{
@@ -40,22 +40,22 @@ func TestHeartBeat(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, endpoint1.lastBeat)
 		assert.NotNil(t, endpoint2.lastBeat)
-		assert.True(t, endpoint1.lastBeat.After(start), "last beat should be after start")
-		assert.True(t, endpoint2.lastBeat.After(start), "last beat should be after start")
+		assert.True(t, endpoint1.lastBeat.After(start), "last Beat should be after start")
+		assert.True(t, endpoint2.lastBeat.After(start), "last Beat should be after start")
 		endpoint1.stop()
 		endpoint2.stop()
 	})
 
 	t.Run("Should return error if there is no registered watchers", func(t *testing.T) {
-		m := New()
+		m := New(&defaultNotifier{})
 		err := m.heartBeat()
 		if assert.Error(t, err) {
 			assert.Equal(t, "no watchers registered", err.Error())
 		}
 	})
 
-	t.Run("Should call error handler if there is an error sending heart beat", func(t *testing.T) {
-		m := New()
+	t.Run("Should call error handler if there is an error sending heart Beat", func(t *testing.T) {
+		m := New(&defaultNotifier{})
 		var receivedError error
 		m.ErrorHandler = func(err error, watcher *Watcher) {
 			receivedError = err
