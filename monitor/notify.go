@@ -13,7 +13,7 @@ type defaultNotifier struct {
 }
 
 func (n *defaultNotifier) Beat(watcherAddress string) error {
-	r, err := http.NewRequest("POST", fmt.Sprintf("%s/monitor/Beat", watcherAddress), nil)
+	r, err := http.NewRequest("POST", fmt.Sprintf("%s/monitor/beat", watcherAddress), nil)
 	if err != nil {
 		return err
 	}

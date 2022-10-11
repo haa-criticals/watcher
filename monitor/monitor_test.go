@@ -69,4 +69,30 @@ func TestHeartBeat(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, receivedError)
 	})
+
+	t.Run("should send 5 heart Beats to all watchers in 5 secs", func(t *testing.T) {
+		endpoint1 := &mockEndpoint{}
+		endpoint2 := &mockEndpoint{}
+		endpoint1.start()
+		endpoint2.start()
+
+		m := New(&defaultNotifier{})
+		m.ErrorHandler = func(err error, watcher *Watcher) {
+			t.Fatalf("error sending heart Beat to %s: %v", watcher.BaseURL, err)
+		}
+
+		m.watchers = []*Watcher{
+			{BaseURL: endpoint1.baseURL()},
+			{BaseURL: endpoint2.baseURL()},
+		}
+
+		go m.StartHeartBeat(time.Second)
+		time.Sleep(5 * time.Second)
+		m.StopHeartBeat()
+		assert.Equal(t, 5, endpoint1.beatCount)
+		assert.Equal(t, 5, endpoint2.beatCount)
+		endpoint1.stop()
+		endpoint2.stop()
+
+	})
 }

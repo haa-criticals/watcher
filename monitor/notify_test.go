@@ -11,14 +11,16 @@ import (
 )
 
 type mockEndpoint struct {
-	server   *httptest.Server
-	lastBeat time.Time
+	server    *httptest.Server
+	lastBeat  time.Time
+	beatCount int
 }
 
 func (m *mockEndpoint) start() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/monitor/beat", func(w http.ResponseWriter, r *http.Request) {
 		m.lastBeat = time.Now()
+		m.beatCount++
 		w.WriteHeader(http.StatusOK)
 		_, err := w.Write([]byte("ok"))
 		if err != nil {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"time"
 )
 
 type Watcher struct {
@@ -14,6 +15,27 @@ type Monitor struct {
 	notifier     Notifier
 	watchers     []*Watcher
 	ErrorHandler func(error, *Watcher)
+	done         chan struct{}
+}
+
+func (m *Monitor) StartHeartBeat(period time.Duration) {
+	t := time.NewTicker(period)
+	for {
+		select {
+		case <-t.C:
+			err := m.heartBeat()
+			if err != nil {
+				log.Printf("error sending heart Beat: %v", err)
+			}
+		case <-m.done:
+			t.Stop()
+			return
+		}
+	}
+}
+
+func (m *Monitor) StopHeartBeat() {
+	m.done <- struct{}{}
 }
 
 func (m *Monitor) heartBeat() error {
@@ -48,5 +70,6 @@ func (m *Monitor) RegisterWatcher(watcher *Watcher) {
 func New(notifier Notifier) *Monitor {
 	return &Monitor{
 		notifier: notifier,
+		done:     make(chan struct{}),
 	}
 }
