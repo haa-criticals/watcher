@@ -29,10 +29,11 @@ type Watcher struct {
 }
 
 type Monitor struct {
-	errorHandler ErrorHandler
-	notifier     Notifier
-	watchers     []*Watcher
-	done         chan struct{}
+	errorHandler    ErrorHandler
+	notifier        Notifier
+	watchers        []*Watcher
+	doneHealthCheck chan struct{}
+	doneHeartBeat   chan struct{}
 }
 
 func (m *Monitor) RegisterWatcher(watcher *Watcher) {
@@ -40,6 +41,11 @@ func (m *Monitor) RegisterWatcher(watcher *Watcher) {
 }
 
 func (m *Monitor) StartHeartBeating(period time.Duration) {
+	if m.doneHeartBeat != nil {
+		return
+	}
+	m.doneHeartBeat = make(chan struct{})
+
 	t := time.NewTicker(period)
 	for {
 		select {
@@ -48,7 +54,7 @@ func (m *Monitor) StartHeartBeating(period time.Duration) {
 			if err != nil {
 				log.Printf("error sending heart Beat: %v", err)
 			}
-		case <-m.done:
+		case <-m.doneHeartBeat:
 			t.Stop()
 			return
 		}
@@ -79,6 +85,12 @@ func (m *Monitor) sendBeatToWatcher(wg *sync.WaitGroup, watcher *Watcher) {
 }
 
 func (m *Monitor) StartHealthChecks(second time.Duration, endpoint string) {
+	if m.doneHealthCheck != nil {
+		return
+	}
+
+	m.doneHealthCheck = make(chan struct{})
+
 	t := time.NewTicker(second)
 	for {
 		select {
@@ -87,7 +99,7 @@ func (m *Monitor) StartHealthChecks(second time.Duration, endpoint string) {
 			if err != nil {
 				log.Printf("error sending health check: %v", err)
 			}
-		case <-m.done:
+		case <-m.doneHealthCheck:
 			t.Stop()
 			return
 		}
@@ -119,12 +131,17 @@ func (m *Monitor) healthCheck(endpoint string) error {
 }
 
 func (m *Monitor) Stop() {
-	close(m.done)
+	if m.doneHeartBeat != nil {
+		close(m.doneHeartBeat)
+	}
+	if m.doneHealthCheck != nil {
+		close(m.doneHealthCheck)
+	}
 }
 
 func New(options ...Option) *Monitor {
 	m := &Monitor{
-		done: make(chan struct{}),
+		doneHealthCheck: make(chan struct{}),
 	}
 
 	for _, opt := range options {

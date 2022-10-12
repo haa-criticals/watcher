@@ -165,6 +165,35 @@ func TestMonitor(t *testing.T) {
 		time.Sleep(3 * time.Second)
 		assert.LessOrEqual(t, endpoint1.healthCheckCount, 2)
 		assert.LessOrEqual(t, endpoint1.beatCount, 2)
+	})
 
+	t.Run("Only one heart beating should be running at a time", func(t *testing.T) {
+		endpoint1 := &mockEndpoint{}
+		endpoint1.start()
+
+		m := New(WithErrorHandler(&testingErrorHandler{t: t, failOnError: true}))
+
+		m.RegisterWatcher(&Watcher{
+			BaseURL: fmt.Sprintf(endpoint1.baseURL()),
+		})
+
+		go m.StartHeartBeating(time.Second)
+		go m.StartHeartBeating(time.Second)
+		time.Sleep(3 * time.Second)
+		m.Stop()
+		assert.LessOrEqual(t, endpoint1.beatCount, 3)
+	})
+
+	t.Run("Only one health check should be running at a time", func(t *testing.T) {
+		endpoint1 := &mockEndpoint{}
+		endpoint1.start()
+
+		m := New(WithErrorHandler(&testingErrorHandler{t: t, failOnError: true}))
+
+		go m.StartHealthChecks(time.Second, fmt.Sprintf("%s/healthz", endpoint1.baseURL()))
+		go m.StartHealthChecks(time.Second, fmt.Sprintf("%s/healthz", endpoint1.baseURL()))
+		time.Sleep(3 * time.Second)
+		m.Stop()
+		assert.LessOrEqual(t, endpoint1.healthCheckCount, 3)
 	})
 }
