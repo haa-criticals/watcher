@@ -11,6 +11,14 @@ func WithHeartBeat(notifier Notifier, interval time.Duration) Option {
 	}
 }
 
+func WithHealthCheck(endpoint string, interval time.Duration, maxFail int) Option {
+	return func(m *Monitor) {
+		m.healthCheckEndpoint = endpoint
+		m.healthCheckInterval = interval
+		m.healthCheckMaxFail = maxFail
+	}
+}
+
 func WithErrorHandler(errorHandler ErrorHandler) Option {
 	return func(m *Monitor) {
 		m.errorHandler = errorHandler

@@ -140,9 +140,9 @@ func TestHealthCheck(t *testing.T) {
 		endpoint1 := &mockEndpoint{}
 		endpoint1.start()
 
-		m := New()
+		m := New(WithHealthCheck(fmt.Sprintf("%s/healthz", endpoint1.baseURL()), time.Second, 3))
 
-		go m.StartHealthChecks(time.Second, fmt.Sprintf("%s/healthz", endpoint1.baseURL()))
+		go m.StartHealthChecks()
 		time.Sleep(6 * time.Second)
 		m.Stop()
 		assert.GreaterOrEqual(t, endpoint1.healthCheckCount, 5)
@@ -158,6 +158,7 @@ func TestMonitor(t *testing.T) {
 		m := New(
 			WithErrorHandler(&testingErrorHandler{t: t, failOnError: true}),
 			WithHeartBeat(&defaultNotifier{}, time.Second),
+			WithHealthCheck(fmt.Sprintf("%s/healthz", endpoint1.baseURL()), time.Second, 3),
 		)
 
 		m.RegisterWatcher(&Watcher{
@@ -165,7 +166,7 @@ func TestMonitor(t *testing.T) {
 		})
 
 		go m.StartHeartBeating()
-		go m.StartHealthChecks(time.Second, fmt.Sprintf("%s/healthz", endpoint1.baseURL()))
+		go m.StartHealthChecks()
 		time.Sleep(2 * time.Second)
 		m.Stop()
 		time.Sleep(3 * time.Second)
@@ -200,8 +201,8 @@ func TestMonitor(t *testing.T) {
 
 		m := New(WithErrorHandler(&testingErrorHandler{t: t, failOnError: true}))
 
-		go m.StartHealthChecks(time.Second, fmt.Sprintf("%s/healthz", endpoint1.baseURL()))
-		go m.StartHealthChecks(time.Second, fmt.Sprintf("%s/healthz", endpoint1.baseURL()))
+		go m.StartHealthChecks()
+		go m.StartHealthChecks()
 		time.Sleep(3 * time.Second)
 		m.Stop()
 		assert.LessOrEqual(t, endpoint1.healthCheckCount, 3)
@@ -211,8 +212,8 @@ func TestMonitor(t *testing.T) {
 		endpoint1 := &mockEndpoint{}
 		endpoint1.start()
 
-		m := New()
-		go m.StartHealthChecks(time.Second, fmt.Sprintf("%s/healthz", endpoint1.baseURL()))
+		m := New(WithHealthCheck(fmt.Sprintf("%s/healthz", endpoint1.baseURL()), time.Second, 3))
+		go m.StartHealthChecks()
 		endpoint1.stop()
 		time.Sleep(4 * time.Second)
 		m.Stop()
@@ -223,15 +224,16 @@ func TestMonitor(t *testing.T) {
 		endpoint1 := &mockEndpoint{}
 		endpoint1.start()
 
-		m := New()
-		go m.StartHealthChecks(time.Second, fmt.Sprintf("%s/healthz", endpoint1.baseURL()))
+		m := New(WithHealthCheck(fmt.Sprintf("%s/healthz", endpoint1.baseURL()), time.Second, 3))
+		go m.StartHealthChecks()
 		endpoint1.stop()
 		time.Sleep(4 * time.Second)
 		m.Stop()
 		assert.Falsef(t, m.IsHealthy(), "Should be unhealthy")
 
 		endpoint1.start()
-		go m.StartHealthChecks(time.Second, fmt.Sprintf("%s/healthz", endpoint1.baseURL()))
+		m.healthCheckEndpoint = fmt.Sprintf("%s/healthz", endpoint1.baseURL())
+		go m.StartHealthChecks()
 		time.Sleep(2 * time.Second)
 		assert.True(t, m.IsHealthy(), "Should be healthy")
 

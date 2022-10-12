@@ -29,17 +29,20 @@ type Watcher struct {
 }
 
 type Monitor struct {
-	errorHandler      ErrorHandler
-	notifier          Notifier
-	watchers          []*Watcher
-	doneHealthCheck   chan struct{}
-	healthCheckLock   sync.Mutex
-	healthCheckErrors int
-	isHealthChecking  bool
-	doneHeartBeat     chan struct{}
-	isHeartBeating    bool
-	heartBeatLock     sync.Mutex
-	heartBeatInterval time.Duration
+	errorHandler        ErrorHandler
+	notifier            Notifier
+	watchers            []*Watcher
+	doneHealthCheck     chan struct{}
+	healthCheckLock     sync.Mutex
+	healthCheckErrors   int
+	isHealthChecking    bool
+	doneHeartBeat       chan struct{}
+	isHeartBeating      bool
+	heartBeatLock       sync.Mutex
+	heartBeatInterval   time.Duration
+	healthCheckEndpoint string
+	healthCheckInterval time.Duration
+	healthCheckMaxFail  int
 }
 
 func (m *Monitor) RegisterWatcher(watcher *Watcher) {
@@ -93,7 +96,11 @@ func (m *Monitor) sendBeatToWatcher(wg *sync.WaitGroup, watcher *Watcher) {
 	}
 }
 
-func (m *Monitor) StartHealthChecks(second time.Duration, endpoint string) {
+func (m *Monitor) StartHealthChecks() {
+	if m.healthCheckEndpoint == "" {
+		log.Printf("no health check endpoint provided")
+		return
+	}
 	m.healthCheckLock.Lock()
 	if m.isHealthChecking {
 		return
@@ -101,11 +108,11 @@ func (m *Monitor) StartHealthChecks(second time.Duration, endpoint string) {
 	m.isHealthChecking = true
 	m.healthCheckLock.Unlock()
 
-	t := time.NewTicker(second)
+	t := time.NewTicker(m.healthCheckInterval)
 	for {
 		select {
 		case <-t.C:
-			err := m.healthCheck(endpoint)
+			err := m.healthCheck(m.healthCheckEndpoint)
 			if err != nil {
 				m.healthCheckErrors++
 				m.errorHandler.OnHealthCheckError(err)
@@ -143,6 +150,10 @@ func (m *Monitor) healthCheck(endpoint string) error {
 	return nil
 }
 
+func (m *Monitor) IsHealthy() bool {
+	return m.healthCheckErrors < m.healthCheckMaxFail
+}
+
 func (m *Monitor) Stop() {
 	if m.isHeartBeating {
 		m.doneHeartBeat <- struct{}{}
@@ -154,15 +165,13 @@ func (m *Monitor) Stop() {
 	}
 }
 
-func (m *Monitor) IsHealthy() bool {
-	return m.healthCheckErrors < 3
-}
-
 func New(options ...Option) *Monitor {
 	m := &Monitor{
-		heartBeatInterval: 5 * time.Second,
-		doneHeartBeat:     make(chan struct{}),
-		doneHealthCheck:   make(chan struct{}),
+		heartBeatInterval:   5 * time.Second,
+		doneHeartBeat:       make(chan struct{}),
+		healthCheckInterval: 5 * time.Second,
+		healthCheckMaxFail:  3,
+		doneHealthCheck:     make(chan struct{}),
 	}
 
 	for _, opt := range options {
