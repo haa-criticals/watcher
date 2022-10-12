@@ -34,6 +34,8 @@ type Monitor struct {
 	watchers        []*Watcher
 	doneHealthCheck chan struct{}
 	doneHeartBeat   chan struct{}
+	heartBeatLock   sync.Mutex
+	healthCheckLock sync.Mutex
 }
 
 func (m *Monitor) RegisterWatcher(watcher *Watcher) {
@@ -41,10 +43,14 @@ func (m *Monitor) RegisterWatcher(watcher *Watcher) {
 }
 
 func (m *Monitor) StartHeartBeating(period time.Duration) {
+	if !m.heartBeatLock.TryLock() {
+		return
+	}
 	if m.doneHeartBeat != nil {
 		return
 	}
 	m.doneHeartBeat = make(chan struct{})
+	m.heartBeatLock.Unlock()
 
 	t := time.NewTicker(period)
 	for {
@@ -85,11 +91,16 @@ func (m *Monitor) sendBeatToWatcher(wg *sync.WaitGroup, watcher *Watcher) {
 }
 
 func (m *Monitor) StartHealthChecks(second time.Duration, endpoint string) {
+	if !m.healthCheckLock.TryLock() {
+		return
+	}
+
 	if m.doneHealthCheck != nil {
 		return
 	}
 
 	m.doneHealthCheck = make(chan struct{})
+	m.healthCheckLock.Unlock()
 
 	t := time.NewTicker(second)
 	for {
