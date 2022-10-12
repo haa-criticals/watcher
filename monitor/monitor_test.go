@@ -91,14 +91,17 @@ func TestHeartBeat(t *testing.T) {
 		endpoint1.start()
 		endpoint2.start()
 
-		m := New(WithErrorHandler(&testingErrorHandler{t: t, failOnError: true}))
+		m := New(
+			WithErrorHandler(&testingErrorHandler{t: t, failOnError: true}),
+			WithHeartBeat(&defaultNotifier{}, time.Second),
+		)
 
 		m.watchers = []*Watcher{
 			{BaseURL: endpoint1.baseURL()},
 			{BaseURL: endpoint2.baseURL()},
 		}
 
-		go m.StartHeartBeating(time.Second)
+		go m.StartHeartBeating()
 		time.Sleep(6 * time.Second)
 		m.Stop()
 		assert.GreaterOrEqual(t, endpoint1.beatCount, 5)
@@ -152,17 +155,21 @@ func TestMonitor(t *testing.T) {
 		endpoint1 := &mockEndpoint{}
 		endpoint1.start()
 
-		m := New(WithErrorHandler(&testingErrorHandler{t: t, failOnError: true}))
+		m := New(
+			WithErrorHandler(&testingErrorHandler{t: t, failOnError: true}),
+			WithHeartBeat(&defaultNotifier{}, time.Second),
+		)
 
 		m.RegisterWatcher(&Watcher{
 			BaseURL: fmt.Sprintf(endpoint1.baseURL()),
 		})
 
-		go m.StartHeartBeating(time.Second)
+		go m.StartHeartBeating()
 		go m.StartHealthChecks(time.Second, fmt.Sprintf("%s/healthz", endpoint1.baseURL()))
 		time.Sleep(2 * time.Second)
 		m.Stop()
 		time.Sleep(3 * time.Second)
+		endpoint1.stop()
 		assert.LessOrEqual(t, endpoint1.healthCheckCount, 2)
 		assert.LessOrEqual(t, endpoint1.beatCount, 2)
 	})
@@ -171,14 +178,17 @@ func TestMonitor(t *testing.T) {
 		endpoint1 := &mockEndpoint{}
 		endpoint1.start()
 
-		m := New(WithErrorHandler(&testingErrorHandler{t: t, failOnError: true}))
+		m := New(
+			WithErrorHandler(&testingErrorHandler{t: t, failOnError: true}),
+			WithHeartBeat(&defaultNotifier{}, time.Second),
+		)
 
 		m.RegisterWatcher(&Watcher{
 			BaseURL: fmt.Sprintf(endpoint1.baseURL()),
 		})
 
-		go m.StartHeartBeating(time.Second)
-		go m.StartHeartBeating(time.Second)
+		go m.StartHeartBeating()
+		go m.StartHeartBeating()
 		time.Sleep(3 * time.Second)
 		m.Stop()
 		assert.LessOrEqual(t, endpoint1.beatCount, 3)

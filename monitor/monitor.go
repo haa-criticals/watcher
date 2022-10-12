@@ -33,27 +33,29 @@ type Monitor struct {
 	notifier          Notifier
 	watchers          []*Watcher
 	doneHealthCheck   chan struct{}
-	doneHeartBeat     chan struct{}
-	heartBeatLock     sync.Mutex
 	healthCheckLock   sync.Mutex
 	healthCheckErrors int
+	isHealthChecking  bool
+	doneHeartBeat     chan struct{}
+	isHeartBeating    bool
+	heartBeatLock     sync.Mutex
+	heartBeatInterval time.Duration
 }
 
 func (m *Monitor) RegisterWatcher(watcher *Watcher) {
 	m.watchers = append(m.watchers, watcher)
 }
 
-func (m *Monitor) StartHeartBeating(period time.Duration) {
-	if !m.heartBeatLock.TryLock() {
+func (m *Monitor) StartHeartBeating() {
+	m.heartBeatLock.Lock()
+
+	if m.isHeartBeating {
 		return
 	}
-	if m.doneHeartBeat != nil {
-		return
-	}
-	m.doneHeartBeat = make(chan struct{})
+	m.isHeartBeating = true
 	m.heartBeatLock.Unlock()
 
-	t := time.NewTicker(period)
+	t := time.NewTicker(m.heartBeatInterval)
 	for {
 		select {
 		case <-t.C:
@@ -92,15 +94,11 @@ func (m *Monitor) sendBeatToWatcher(wg *sync.WaitGroup, watcher *Watcher) {
 }
 
 func (m *Monitor) StartHealthChecks(second time.Duration, endpoint string) {
-	if !m.healthCheckLock.TryLock() {
+	m.healthCheckLock.Lock()
+	if m.isHealthChecking {
 		return
 	}
-
-	if m.doneHealthCheck != nil {
-		return
-	}
-
-	m.doneHealthCheck = make(chan struct{})
+	m.isHealthChecking = true
 	m.healthCheckLock.Unlock()
 
 	t := time.NewTicker(second)
@@ -146,13 +144,13 @@ func (m *Monitor) healthCheck(endpoint string) error {
 }
 
 func (m *Monitor) Stop() {
-	if m.doneHeartBeat != nil {
-		close(m.doneHeartBeat)
-		m.doneHeartBeat = nil
+	if m.isHeartBeating {
+		m.doneHeartBeat <- struct{}{}
+		m.isHeartBeating = false
 	}
-	if m.doneHealthCheck != nil {
-		close(m.doneHealthCheck)
-		m.doneHealthCheck = nil
+	if m.isHealthChecking {
+		m.doneHealthCheck <- struct{}{}
+		m.isHealthChecking = false
 	}
 }
 
@@ -161,7 +159,11 @@ func (m *Monitor) IsHealthy() bool {
 }
 
 func New(options ...Option) *Monitor {
-	m := &Monitor{}
+	m := &Monitor{
+		heartBeatInterval: 5 * time.Second,
+		doneHeartBeat:     make(chan struct{}),
+		doneHealthCheck:   make(chan struct{}),
+	}
 
 	for _, opt := range options {
 		opt(m)

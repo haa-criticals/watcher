@@ -1,10 +1,13 @@
 package monitor
 
+import "time"
+
 type Option func(monitor *Monitor)
 
-func WithNotifier(notifier Notifier) Option {
+func WithHeartBeat(notifier Notifier, interval time.Duration) Option {
 	return func(m *Monitor) {
 		m.notifier = notifier
+		m.heartBeatInterval = interval
 	}
 }
 
