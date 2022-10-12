@@ -29,13 +29,14 @@ type Watcher struct {
 }
 
 type Monitor struct {
-	errorHandler    ErrorHandler
-	notifier        Notifier
-	watchers        []*Watcher
-	doneHealthCheck chan struct{}
-	doneHeartBeat   chan struct{}
-	heartBeatLock   sync.Mutex
-	healthCheckLock sync.Mutex
+	errorHandler      ErrorHandler
+	notifier          Notifier
+	watchers          []*Watcher
+	doneHealthCheck   chan struct{}
+	doneHeartBeat     chan struct{}
+	heartBeatLock     sync.Mutex
+	healthCheckLock   sync.Mutex
+	healthCheckErrors int
 }
 
 func (m *Monitor) RegisterWatcher(watcher *Watcher) {
@@ -108,7 +109,10 @@ func (m *Monitor) StartHealthChecks(second time.Duration, endpoint string) {
 		case <-t.C:
 			err := m.healthCheck(endpoint)
 			if err != nil {
-				log.Printf("error sending health check: %v", err)
+				m.healthCheckErrors++
+				m.errorHandler.OnHealthCheckError(err)
+			} else {
+				m.healthCheckErrors = 0
 			}
 		case <-m.doneHealthCheck:
 			t.Stop()
@@ -144,16 +148,20 @@ func (m *Monitor) healthCheck(endpoint string) error {
 func (m *Monitor) Stop() {
 	if m.doneHeartBeat != nil {
 		close(m.doneHeartBeat)
+		m.doneHeartBeat = nil
 	}
 	if m.doneHealthCheck != nil {
 		close(m.doneHealthCheck)
+		m.doneHealthCheck = nil
 	}
 }
 
+func (m *Monitor) IsHealthy() bool {
+	return m.healthCheckErrors < 3
+}
+
 func New(options ...Option) *Monitor {
-	m := &Monitor{
-		doneHealthCheck: make(chan struct{}),
-	}
+	m := &Monitor{}
 
 	for _, opt := range options {
 		opt(m)

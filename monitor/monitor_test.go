@@ -196,4 +196,36 @@ func TestMonitor(t *testing.T) {
 		m.Stop()
 		assert.LessOrEqual(t, endpoint1.healthCheckCount, 3)
 	})
+
+	t.Run("Should be unhealthy if the health check is not successful", func(t *testing.T) {
+		endpoint1 := &mockEndpoint{}
+		endpoint1.start()
+
+		m := New()
+		go m.StartHealthChecks(time.Second, fmt.Sprintf("%s/healthz", endpoint1.baseURL()))
+		endpoint1.stop()
+		time.Sleep(4 * time.Second)
+		m.Stop()
+		assert.Falsef(t, m.IsHealthy(), "Should be unhealthy")
+	})
+
+	t.Run("Should be healthy if the health check is successful", func(t *testing.T) {
+		endpoint1 := &mockEndpoint{}
+		endpoint1.start()
+
+		m := New()
+		go m.StartHealthChecks(time.Second, fmt.Sprintf("%s/healthz", endpoint1.baseURL()))
+		endpoint1.stop()
+		time.Sleep(4 * time.Second)
+		m.Stop()
+		assert.Falsef(t, m.IsHealthy(), "Should be unhealthy")
+
+		endpoint1.start()
+		go m.StartHealthChecks(time.Second, fmt.Sprintf("%s/healthz", endpoint1.baseURL()))
+		time.Sleep(2 * time.Second)
+		assert.True(t, m.IsHealthy(), "Should be healthy")
+
+		m.Stop()
+		endpoint1.stop()
+	})
 }
