@@ -9,15 +9,30 @@ import (
 	"time"
 )
 
+type ErrorHandler interface {
+	OnHeartBeatError(err error, watcher *Watcher)
+	OnHealthCheckError(err error)
+}
+
+type defaultErrorHandler struct{}
+
+func (d *defaultErrorHandler) OnHeartBeatError(err error, watcher *Watcher) {
+	log.Printf("error sending heart Beat to %s: %v", watcher.BaseURL, err)
+}
+
+func (d *defaultErrorHandler) OnHealthCheckError(err error) {
+	log.Printf("error sending health check: %v", err)
+}
+
 type Watcher struct {
 	BaseURL string
 }
 
 type Monitor struct {
-	notifier              Notifier
-	watchers              []*Watcher
-	HeartBeatErrorHandler func(error, *Watcher)
-	done                  chan struct{}
+	errorHandler ErrorHandler
+	notifier     Notifier
+	watchers     []*Watcher
+	done         chan struct{}
 }
 
 func (m *Monitor) RegisterWatcher(watcher *Watcher) {
@@ -59,9 +74,7 @@ func (m *Monitor) sendBeatToWatcher(wg *sync.WaitGroup, watcher *Watcher) {
 	err := m.notifier.Beat(watcher.BaseURL)
 	if err != nil {
 		log.Printf("error sending heart Beat to %s: %v", watcher.BaseURL, err)
-		if m.HeartBeatErrorHandler != nil {
-			m.HeartBeatErrorHandler(err, watcher)
-		}
+		m.errorHandler.OnHeartBeatError(err, watcher)
 	}
 }
 
@@ -109,9 +122,21 @@ func (m *Monitor) Stop() {
 	close(m.done)
 }
 
-func New(notifier Notifier) *Monitor {
-	return &Monitor{
-		notifier: notifier,
-		done:     make(chan struct{}),
+func New(options ...Option) *Monitor {
+	m := &Monitor{
+		done: make(chan struct{}),
 	}
+
+	for _, opt := range options {
+		opt(m)
+	}
+
+	if m.errorHandler == nil {
+		m.errorHandler = &defaultErrorHandler{}
+	}
+
+	if m.notifier == nil {
+		m.notifier = &defaultNotifier{}
+	}
+	return m
 }

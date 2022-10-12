@@ -8,9 +8,29 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type testingErrorHandler struct {
+	t             *testing.T
+	failOnError   bool
+	receivedError error
+}
+
+func (f *testingErrorHandler) OnHeartBeatError(err error, watcher *Watcher) {
+	f.receivedError = err
+	if f.failOnError {
+		f.t.Fatalf("error sending heart Beat to %s: %v", watcher.BaseURL, err)
+	}
+}
+
+func (f *testingErrorHandler) OnHealthCheckError(err error) {
+	f.receivedError = err
+	if f.failOnError {
+		f.t.Fatalf("error sending health check: %v", err)
+	}
+}
+
 func TestRegisterWatcher(t *testing.T) {
 	t.Run("Should register watchers", func(t *testing.T) {
-		m := New(&defaultNotifier{})
+		m := New()
 		assert.Len(t, m.watchers, 0)
 		m.RegisterWatcher(&Watcher{})
 		assert.Len(t, m.watchers, 1)
@@ -26,10 +46,7 @@ func TestHeartBeat(t *testing.T) {
 
 		start := time.Now()
 
-		m := New(&defaultNotifier{})
-		m.HeartBeatErrorHandler = func(err error, watcher *Watcher) {
-			t.Fatalf("error sending heart Beat to %s: %v", watcher.BaseURL, err)
-		}
+		m := New(WithErrorHandler(&testingErrorHandler{t: t, failOnError: true}))
 
 		m.watchers = []*Watcher{
 			{BaseURL: endpoint1.baseURL()},
@@ -48,7 +65,7 @@ func TestHeartBeat(t *testing.T) {
 	})
 
 	t.Run("Should return error if there is no registered watchers", func(t *testing.T) {
-		m := New(&defaultNotifier{})
+		m := New()
 		err := m.heartBeat()
 		if assert.Error(t, err) {
 			assert.Equal(t, "no watchers registered", err.Error())
@@ -56,11 +73,8 @@ func TestHeartBeat(t *testing.T) {
 	})
 
 	t.Run("Should call error handler if there is an error sending heart Beat", func(t *testing.T) {
-		m := New(&defaultNotifier{})
-		var receivedError error
-		m.HeartBeatErrorHandler = func(err error, watcher *Watcher) {
-			receivedError = err
-		}
+		handler := &testingErrorHandler{t: t}
+		m := New(WithErrorHandler(handler))
 
 		m.watchers = []*Watcher{
 			{BaseURL: "http://localhost:1234"},
@@ -68,7 +82,7 @@ func TestHeartBeat(t *testing.T) {
 
 		err := m.heartBeat()
 		assert.NoError(t, err)
-		assert.NotNil(t, receivedError)
+		assert.Error(t, handler.receivedError)
 	})
 
 	t.Run("should send at least 5 heart Beats to all watchers in 6 secs", func(t *testing.T) {
@@ -77,10 +91,7 @@ func TestHeartBeat(t *testing.T) {
 		endpoint1.start()
 		endpoint2.start()
 
-		m := New(&defaultNotifier{})
-		m.HeartBeatErrorHandler = func(err error, watcher *Watcher) {
-			t.Fatalf("error sending heart Beat to %s: %v", watcher.BaseURL, err)
-		}
+		m := New(WithErrorHandler(&testingErrorHandler{t: t, failOnError: true}))
 
 		m.watchers = []*Watcher{
 			{BaseURL: endpoint1.baseURL()},
@@ -101,7 +112,7 @@ func TestHealthCheck(t *testing.T) {
 		endpoint1 := &mockEndpoint{}
 		endpoint1.start()
 
-		m := New(&defaultNotifier{})
+		m := New()
 
 		err := m.healthCheck(fmt.Sprintf("%s/healthz", endpoint1.baseURL()))
 		assert.NoError(t, err)
@@ -112,7 +123,7 @@ func TestHealthCheck(t *testing.T) {
 		endpoint1 := &mockEndpoint{}
 		endpoint1.start()
 
-		m := New(&defaultNotifier{})
+		m := New()
 		healthEndpoint := fmt.Sprintf("%s/healthz", endpoint1.baseURL())
 
 		err := m.healthCheck(healthEndpoint)
@@ -126,7 +137,7 @@ func TestHealthCheck(t *testing.T) {
 		endpoint1 := &mockEndpoint{}
 		endpoint1.start()
 
-		m := New(&defaultNotifier{})
+		m := New()
 
 		go m.StartHealthChecks(time.Second, fmt.Sprintf("%s/healthz", endpoint1.baseURL()))
 		time.Sleep(6 * time.Second)
@@ -141,10 +152,7 @@ func TestMonitor(t *testing.T) {
 		endpoint1 := &mockEndpoint{}
 		endpoint1.start()
 
-		m := New(&defaultNotifier{})
-		m.HeartBeatErrorHandler = func(err error, watcher *Watcher) {
-			t.Fatalf("error sending heart Beat to %s: %v", watcher.BaseURL, err)
-		}
+		m := New(WithErrorHandler(&testingErrorHandler{t: t, failOnError: true}))
 
 		m.RegisterWatcher(&Watcher{
 			BaseURL: fmt.Sprintf(endpoint1.baseURL()),
