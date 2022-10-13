@@ -2,9 +2,7 @@ package monitor
 
 import (
 	"fmt"
-	"io"
 	"log"
-	"net/http"
 	"sync"
 	"time"
 )
@@ -29,20 +27,14 @@ type Watcher struct {
 }
 
 type Monitor struct {
-	errorHandler        ErrorHandler
-	notifier            Notifier
-	watchers            []*Watcher
-	doneHealthCheck     chan struct{}
-	healthCheckLock     sync.Mutex
-	healthCheckErrors   int
-	isHealthChecking    bool
-	doneHeartBeat       chan struct{}
-	isHeartBeating      bool
-	heartBeatLock       sync.Mutex
-	heartBeatInterval   time.Duration
-	healthCheckEndpoint string
-	healthCheckInterval time.Duration
-	healthCheckMaxFail  int
+	errorHandler      ErrorHandler
+	notifier          Notifier
+	watchers          []*Watcher
+	healthChecker     *healthChecker
+	doneHeartBeat     chan struct{}
+	isHeartBeating    bool
+	heartBeatLock     sync.Mutex
+	heartBeatInterval time.Duration
 }
 
 func (m *Monitor) RegisterWatcher(watcher *Watcher) {
@@ -97,61 +89,11 @@ func (m *Monitor) sendBeatToWatcher(wg *sync.WaitGroup, watcher *Watcher) {
 }
 
 func (m *Monitor) StartHealthChecks() {
-	if m.healthCheckEndpoint == "" {
-		log.Printf("no health check endpoint provided")
-		return
-	}
-	m.healthCheckLock.Lock()
-	if m.isHealthChecking {
-		return
-	}
-	m.isHealthChecking = true
-	m.healthCheckLock.Unlock()
-
-	t := time.NewTicker(m.healthCheckInterval)
-	for {
-		select {
-		case <-t.C:
-			err := m.healthCheck(m.healthCheckEndpoint)
-			if err != nil {
-				m.healthCheckErrors++
-				m.errorHandler.OnHealthCheckError(err)
-			} else {
-				m.healthCheckErrors = 0
-			}
-		case <-m.doneHealthCheck:
-			t.Stop()
-			return
-		}
-	}
-}
-
-func (m *Monitor) healthCheck(endpoint string) error {
-	r, err := http.NewRequest("GET", endpoint, nil)
-	if err != nil {
-		return err
-	}
-	res, err := http.DefaultClient.Do(r)
-
-	if err != nil {
-		return err
-	}
-
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.Printf("error closing response body: %v", err)
-		}
-	}(res.Body)
-
-	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status code: %d", res.StatusCode)
-	}
-	return nil
+	m.healthChecker.Start()
 }
 
 func (m *Monitor) IsHealthy() bool {
-	return m.healthCheckErrors < m.healthCheckMaxFail
+	return m.healthChecker.fails < m.healthChecker.maxFails
 }
 
 func (m *Monitor) Stop() {
@@ -159,19 +101,18 @@ func (m *Monitor) Stop() {
 		m.doneHeartBeat <- struct{}{}
 		m.isHeartBeating = false
 	}
-	if m.isHealthChecking {
-		m.doneHealthCheck <- struct{}{}
-		m.isHealthChecking = false
-	}
+	m.healthChecker.Stop()
 }
 
 func New(options ...Option) *Monitor {
 	m := &Monitor{
-		heartBeatInterval:   5 * time.Second,
-		doneHeartBeat:       make(chan struct{}),
-		healthCheckInterval: 5 * time.Second,
-		healthCheckMaxFail:  3,
-		doneHealthCheck:     make(chan struct{}),
+		heartBeatInterval: 5 * time.Second,
+		doneHeartBeat:     make(chan struct{}),
+		healthChecker: &healthChecker{
+			interval: 5 * time.Second,
+			maxFails: 3,
+			done:     make(chan struct{}),
+		},
 	}
 
 	for _, opt := range options {
@@ -185,5 +126,7 @@ func New(options ...Option) *Monitor {
 	if m.notifier == nil {
 		m.notifier = &defaultNotifier{}
 	}
+
+	m.healthChecker.errorHandler = m.errorHandler.OnHealthCheckError
 	return m
 }

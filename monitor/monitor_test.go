@@ -110,46 +110,6 @@ func TestHeartBeat(t *testing.T) {
 	})
 }
 
-func TestHealthCheck(t *testing.T) {
-	t.Run("Should return true if the endpoint is alive", func(t *testing.T) {
-		endpoint1 := &mockEndpoint{}
-		endpoint1.start()
-
-		m := New()
-
-		err := m.healthCheck(fmt.Sprintf("%s/healthz", endpoint1.baseURL()))
-		assert.NoError(t, err)
-		endpoint1.stop()
-	})
-
-	t.Run("Should return error the endpoint is dead", func(t *testing.T) {
-		endpoint1 := &mockEndpoint{}
-		endpoint1.start()
-
-		m := New()
-		healthEndpoint := fmt.Sprintf("%s/healthz", endpoint1.baseURL())
-
-		err := m.healthCheck(healthEndpoint)
-		assert.NoError(t, err)
-		endpoint1.stop()
-		err = m.healthCheck(healthEndpoint)
-		assert.Error(t, err)
-	})
-
-	t.Run("Should send at least 5 health checks in 6 secs", func(t *testing.T) {
-		endpoint1 := &mockEndpoint{}
-		endpoint1.start()
-
-		m := New(WithHealthCheck(fmt.Sprintf("%s/healthz", endpoint1.baseURL()), time.Second, 3))
-
-		go m.StartHealthChecks()
-		time.Sleep(6 * time.Second)
-		m.Stop()
-		assert.GreaterOrEqual(t, endpoint1.healthCheckCount, 5)
-
-	})
-}
-
 func TestMonitor(t *testing.T) {
 	t.Run("Should send at most 2 heart beats and 2 health checks in 2 secs", func(t *testing.T) {
 		endpoint1 := &mockEndpoint{}
@@ -232,7 +192,7 @@ func TestMonitor(t *testing.T) {
 		assert.Falsef(t, m.IsHealthy(), "Should be unhealthy")
 
 		endpoint1.start()
-		m.healthCheckEndpoint = fmt.Sprintf("%s/healthz", endpoint1.baseURL())
+		m.healthChecker.endpoint = fmt.Sprintf("%s/healthz", endpoint1.baseURL())
 		go m.StartHealthChecks()
 		time.Sleep(2 * time.Second)
 		assert.True(t, m.IsHealthy(), "Should be healthy")
