@@ -1,6 +1,7 @@
 package watcher
 
 import (
+	"log"
 	"sync"
 	"time"
 )
@@ -10,17 +11,22 @@ type NodeInfo struct {
 }
 
 type Watcher struct {
-	leader                 NodeInfo
+	leader                 *NodeInfo
 	lastReceivedBeat       time.Time
 	checkHeartBeatInterval time.Duration
 	maxLeaderAliveInterval time.Duration
 	doneHeartBeatChecking  chan struct{}
-	OnLeaderDown           func(info NodeInfo, lastReceivedBeat time.Time)
+	OnLeaderDown           func(info *NodeInfo, lastReceivedBeat time.Time)
 	checkingHeartBeat      bool
 	checkingHeartBeatLock  sync.Mutex
 }
 
 func (w *Watcher) StartHeartBeatChecking() {
+	if w.leader == nil {
+		log.Println("There is no elected leader, can't start heart beat checking")
+		return
+	}
+
 	w.checkingHeartBeatLock.Lock()
 	if w.checkingHeartBeat {
 		w.checkingHeartBeatLock.Unlock()
@@ -53,4 +59,8 @@ func (w *Watcher) StopHeartBeatChecking() {
 
 func (w *Watcher) OnReceiveHeartBeat(heartBeatTime time.Time) {
 	w.lastReceivedBeat = heartBeatTime
+}
+
+func (w *Watcher) RegisterLeader(leader *NodeInfo) {
+	w.leader = leader
 }

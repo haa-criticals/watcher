@@ -11,9 +11,10 @@ func TestWatcher(t *testing.T) {
 		leaderDownTriggered := false
 		w := &Watcher{
 			lastReceivedBeat:       time.Now(),
+			leader:                 &NodeInfo{},
 			checkHeartBeatInterval: time.Second,
 			maxLeaderAliveInterval: 2 * time.Second,
-			OnLeaderDown: func(leader NodeInfo, lastReceivedBeat time.Time) {
+			OnLeaderDown: func(leader *NodeInfo, lastReceivedBeat time.Time) {
 				leaderDownTriggered = true
 			},
 		}
@@ -29,7 +30,7 @@ func TestWatcher(t *testing.T) {
 			lastReceivedBeat:       time.Now(),
 			checkHeartBeatInterval: time.Second,
 			maxLeaderAliveInterval: 2 * time.Second,
-			OnLeaderDown: func(leader NodeInfo, lastReceivedBeat time.Time) {
+			OnLeaderDown: func(leader *NodeInfo, lastReceivedBeat time.Time) {
 				leaderDownTriggered = true
 			},
 		}
@@ -40,5 +41,39 @@ func TestWatcher(t *testing.T) {
 		time.Sleep(1 * time.Second)
 		w.OnReceiveHeartBeat(time.Now())
 		assert.False(t, leaderDownTriggered)
+	})
+
+	t.Run("Should not start checking heart beat if already started", func(t *testing.T) {
+		leaderDownTriggeredCount := 0
+		w := &Watcher{
+			lastReceivedBeat:       time.Now(),
+			leader:                 &NodeInfo{},
+			checkHeartBeatInterval: 2 * time.Second,
+			maxLeaderAliveInterval: 2 * time.Second,
+			OnLeaderDown: func(leader *NodeInfo, lastReceivedBeat time.Time) {
+				leaderDownTriggeredCount = leaderDownTriggeredCount + 1
+			},
+		}
+
+		go w.StartHeartBeatChecking()
+		go w.StartHeartBeatChecking()
+		time.Sleep(3 * time.Second)
+		assert.Equal(t, 1, leaderDownTriggeredCount)
+	})
+
+	t.Run("Should not start checking heart beat if there is no leader", func(t *testing.T) {
+		leaderDownTriggeredCount := 0
+		w := &Watcher{
+			lastReceivedBeat:       time.Now(),
+			checkHeartBeatInterval: time.Second,
+			maxLeaderAliveInterval: 2 * time.Second,
+			OnLeaderDown: func(leader *NodeInfo, lastReceivedBeat time.Time) {
+				leaderDownTriggeredCount = leaderDownTriggeredCount + 1
+			},
+		}
+
+		go w.StartHeartBeatChecking()
+		time.Sleep(3 * time.Second)
+		assert.Equal(t, 0, leaderDownTriggeredCount)
 	})
 }
