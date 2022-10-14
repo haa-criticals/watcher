@@ -50,3 +50,7 @@ func (w *Watcher) StopHeartBeatChecking() {
 		w.checkingHeartBeat = false
 	}
 }
+
+func (w *Watcher) OnReceiveHeartBeat(heartBeatTime time.Time) {
+	w.lastReceivedBeat = heartBeatTime
+}

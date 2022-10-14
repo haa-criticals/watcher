@@ -22,4 +22,23 @@ func TestWatcher(t *testing.T) {
 		time.Sleep(3 * time.Second)
 		assert.True(t, leaderDownTriggered)
 	})
+
+	t.Run("Should not notify leader down if received beat in time", func(t *testing.T) {
+		leaderDownTriggered := false
+		w := &Watcher{
+			lastReceivedBeat:       time.Now(),
+			checkHeartBeatInterval: time.Second,
+			maxLeaderAliveInterval: 2 * time.Second,
+			OnLeaderDown: func(leader NodeInfo, lastReceivedBeat time.Time) {
+				leaderDownTriggered = true
+			},
+		}
+
+		go w.StartHeartBeatChecking()
+		time.Sleep(1 * time.Second)
+		w.OnReceiveHeartBeat(time.Now())
+		time.Sleep(1 * time.Second)
+		w.OnReceiveHeartBeat(time.Now())
+		assert.False(t, leaderDownTriggered)
+	})
 }
