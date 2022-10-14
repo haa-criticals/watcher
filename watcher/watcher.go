@@ -1,6 +1,7 @@
 package watcher
 
 import (
+	"errors"
 	"log"
 	"sync"
 	"time"
@@ -21,6 +22,8 @@ type Watcher struct {
 	lastLeaderDownNotificationTime    time.Time
 	minLeaderDownNotificationInterval time.Duration
 	OnLeaderDown                      func(info *NodeInfo, lastReceivedBeat time.Time)
+	nodes                             []*NodeInfo
+	registrationKey                   string
 }
 
 func (w *Watcher) StartHeartBeatChecking() {
@@ -72,4 +75,12 @@ func (w *Watcher) onNoReceivedHeartBeat() {
 		w.lastLeaderDownNotificationTime = time.Now()
 		w.OnLeaderDown(w.leader, w.lastReceivedBeat)
 	}
+}
+
+func (w *Watcher) RegisterNode(n *NodeInfo, key string) error {
+	if key != w.registrationKey {
+		return errors.New("invalid registration key")
+	}
+	w.nodes = append(w.nodes, n)
+	return nil
 }

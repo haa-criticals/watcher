@@ -114,4 +114,24 @@ func TestWatcher(t *testing.T) {
 		time.Sleep(4 * time.Second)
 		assert.Equal(t, 1, leaderDownTriggeredCount)
 	})
+
+	t.Run("Should register nodes", func(t *testing.T) {
+		w := &Watcher{
+			registrationKey: "key",
+		}
+		err := w.RegisterNode(&NodeInfo{BaseURL: "http://localhost:8080"}, "key")
+		assert.NoError(t, err)
+		err = w.RegisterNode(&NodeInfo{BaseURL: "http://localhost:8081"}, "key")
+		assert.NoError(t, err)
+		assert.Equal(t, 2, len(w.nodes))
+	})
+
+	t.Run("Node Register should fail if the key does not matches", func(t *testing.T) {
+		w := &Watcher{
+			registrationKey: "key",
+		}
+		err := w.RegisterNode(&NodeInfo{BaseURL: "http://localhost:8080"}, "key1")
+		assert.Error(t, err)
+		assert.Equal(t, 0, len(w.nodes))
+	})
 }
