@@ -96,4 +96,22 @@ func TestWatcher(t *testing.T) {
 		time.Sleep(2 * time.Second)
 		assert.False(t, leaderDownTriggered)
 	})
+
+	t.Run("Should not notify leader down if min notification interval is not passed yet", func(t *testing.T) {
+		leaderDownTriggeredCount := 0
+		w := &Watcher{
+			lastReceivedBeat:                  time.Now(),
+			leader:                            &NodeInfo{},
+			checkHeartBeatInterval:            1 * time.Second,
+			maxLeaderAliveInterval:            2 * time.Second,
+			minLeaderDownNotificationInterval: 3 * time.Second,
+			OnLeaderDown: func(leader *NodeInfo, lastReceivedBeat time.Time) {
+				leaderDownTriggeredCount++
+			},
+		}
+
+		go w.StartHeartBeatChecking()
+		time.Sleep(4 * time.Second)
+		assert.Equal(t, 1, leaderDownTriggeredCount)
+	})
 }

@@ -11,14 +11,16 @@ type NodeInfo struct {
 }
 
 type Watcher struct {
-	leader                 *NodeInfo
-	lastReceivedBeat       time.Time
-	checkHeartBeatInterval time.Duration
-	maxLeaderAliveInterval time.Duration
-	doneHeartBeatChecking  chan struct{}
-	OnLeaderDown           func(info *NodeInfo, lastReceivedBeat time.Time)
-	checkingHeartBeat      bool
-	checkingHeartBeatLock  sync.Mutex
+	leader                            *NodeInfo
+	lastReceivedBeat                  time.Time
+	checkHeartBeatInterval            time.Duration
+	maxLeaderAliveInterval            time.Duration
+	doneHeartBeatChecking             chan struct{}
+	checkingHeartBeat                 bool
+	checkingHeartBeatLock             sync.Mutex
+	lastLeaderDownNotificationTime    time.Time
+	minLeaderDownNotificationInterval time.Duration
+	OnLeaderDown                      func(info *NodeInfo, lastReceivedBeat time.Time)
 }
 
 func (w *Watcher) StartHeartBeatChecking() {
@@ -41,7 +43,7 @@ func (w *Watcher) StartHeartBeatChecking() {
 		select {
 		case <-t.C:
 			if time.Now().Sub(w.lastReceivedBeat) > w.maxLeaderAliveInterval {
-				w.OnLeaderDown(w.leader, w.lastReceivedBeat)
+				w.onNoReceivedHeartBeat()
 			}
 		case <-w.doneHeartBeatChecking:
 			t.Stop()
@@ -63,4 +65,11 @@ func (w *Watcher) OnReceiveHeartBeat(heartBeatTime time.Time) {
 
 func (w *Watcher) RegisterLeader(leader *NodeInfo) {
 	w.leader = leader
+}
+
+func (w *Watcher) onNoReceivedHeartBeat() {
+	if time.Now().Sub(w.lastLeaderDownNotificationTime) > w.minLeaderDownNotificationInterval {
+		w.lastLeaderDownNotificationTime = time.Now()
+		w.OnLeaderDown(w.leader, w.lastReceivedBeat)
+	}
 }
