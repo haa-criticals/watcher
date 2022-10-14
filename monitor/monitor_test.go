@@ -15,7 +15,7 @@ type testingErrorHandler struct {
 	receivedError error
 }
 
-func (f *testingErrorHandler) OnHeartBeatError(err error, watcher *watcher.Info) {
+func (f *testingErrorHandler) OnHeartBeatError(err error, watcher *watcher.NodeInfo) {
 	f.receivedError = err
 	if f.failOnError {
 		f.t.Fatalf("error sending heart Beat to %s: %v", watcher.BaseURL, err)
@@ -33,7 +33,7 @@ func TestRegisterWatcher(t *testing.T) {
 	t.Run("Should register watchers", func(t *testing.T) {
 		m := New()
 		assert.Len(t, m.watchers, 0)
-		m.RegisterWatcher(&watcher.Info{})
+		m.RegisterWatcher(&watcher.NodeInfo{})
 		assert.Len(t, m.watchers, 1)
 	})
 }
@@ -49,7 +49,7 @@ func TestHeartBeat(t *testing.T) {
 
 		m := New(WithErrorHandler(&testingErrorHandler{t: t, failOnError: true}))
 
-		m.watchers = []*watcher.Info{
+		m.watchers = []*watcher.NodeInfo{
 			{BaseURL: endpoint1.baseURL()},
 			{BaseURL: endpoint2.baseURL()},
 		}
@@ -77,7 +77,7 @@ func TestHeartBeat(t *testing.T) {
 		handler := &testingErrorHandler{t: t}
 		m := New(WithErrorHandler(handler))
 
-		m.watchers = []*watcher.Info{
+		m.watchers = []*watcher.NodeInfo{
 			{BaseURL: "http://localhost:1234"},
 		}
 
@@ -97,7 +97,7 @@ func TestHeartBeat(t *testing.T) {
 			WithHeartBeat(&defaultNotifier{}, time.Second),
 		)
 
-		m.watchers = []*watcher.Info{
+		m.watchers = []*watcher.NodeInfo{
 			{BaseURL: endpoint1.baseURL()},
 			{BaseURL: endpoint2.baseURL()},
 		}
@@ -122,7 +122,7 @@ func TestMonitor(t *testing.T) {
 			WithHealthCheck(fmt.Sprintf("%s/healthz", endpoint1.baseURL()), time.Second, 3),
 		)
 
-		m.RegisterWatcher(&watcher.Info{
+		m.RegisterWatcher(&watcher.NodeInfo{
 			BaseURL: fmt.Sprintf(endpoint1.baseURL()),
 		})
 
@@ -145,7 +145,7 @@ func TestMonitor(t *testing.T) {
 			WithHeartBeat(&defaultNotifier{}, time.Second),
 		)
 
-		m.RegisterWatcher(&watcher.Info{
+		m.RegisterWatcher(&watcher.NodeInfo{
 			BaseURL: fmt.Sprintf(endpoint1.baseURL()),
 		})
 

@@ -5,17 +5,17 @@ import (
 	"time"
 )
 
-type Info struct {
+type NodeInfo struct {
 	BaseURL string
 }
 
 type Watcher struct {
-	leader                 Info
+	leader                 NodeInfo
 	lastReceivedBeat       time.Time
 	checkHeartBeatInterval time.Duration
 	maxLeaderAliveInterval time.Duration
 	doneHeartBeatChecking  chan struct{}
-	OnLeaderDown           func(info Info, lastReceivedBeat time.Time)
+	OnLeaderDown           func(info NodeInfo, lastReceivedBeat time.Time)
 	checkingHeartBeat      bool
 	checkingHeartBeatLock  sync.Mutex
 }

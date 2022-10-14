@@ -10,13 +10,13 @@ import (
 )
 
 type ErrorHandler interface {
-	OnHeartBeatError(err error, watcher *watcher.Info)
+	OnHeartBeatError(err error, watcher *watcher.NodeInfo)
 	OnHealthCheckError(err error)
 }
 
 type defaultErrorHandler struct{}
 
-func (d *defaultErrorHandler) OnHeartBeatError(err error, watcher *watcher.Info) {
+func (d *defaultErrorHandler) OnHeartBeatError(err error, watcher *watcher.NodeInfo) {
 	log.Printf("error sending heart Beat to %s: %v", watcher.BaseURL, err)
 }
 
@@ -27,7 +27,7 @@ func (d *defaultErrorHandler) OnHealthCheckError(err error) {
 type Monitor struct {
 	errorHandler      ErrorHandler
 	notifier          Notifier
-	watchers          []*watcher.Info
+	watchers          []*watcher.NodeInfo
 	healthChecker     *healthChecker
 	doneHeartBeat     chan struct{}
 	isHeartBeating    bool
@@ -35,7 +35,7 @@ type Monitor struct {
 	heartBeatInterval time.Duration
 }
 
-func (m *Monitor) RegisterWatcher(watcher *watcher.Info) {
+func (m *Monitor) RegisterWatcher(watcher *watcher.NodeInfo) {
 	m.watchers = append(m.watchers, watcher)
 }
 
@@ -78,7 +78,7 @@ func (m *Monitor) heartBeat() error {
 	return nil
 }
 
-func (m *Monitor) sendBeatToWatcher(wg *sync.WaitGroup, watcher *watcher.Info) {
+func (m *Monitor) sendBeatToWatcher(wg *sync.WaitGroup, watcher *watcher.NodeInfo) {
 	defer wg.Done()
 	err := m.notifier.Beat(watcher.BaseURL)
 	if err != nil {

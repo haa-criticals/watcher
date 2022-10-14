@@ -23,7 +23,7 @@ func New(monitor *monitor.Monitor) *App {
 }
 
 func (a *App) Register(_ context.Context, in *pb.RegisterRequest) (*pb.RegisterResponse, error) {
-	a.monitor.RegisterWatcher(&watcher.Info{BaseURL: in.Address})
+	a.monitor.RegisterWatcher(&watcher.NodeInfo{BaseURL: in.Address})
 	return &pb.RegisterResponse{
 		Success: true,
 	}, nil

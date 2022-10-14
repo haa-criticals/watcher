@@ -13,7 +13,7 @@ func TestWatcher(t *testing.T) {
 			lastReceivedBeat:       time.Now(),
 			checkHeartBeatInterval: time.Second,
 			maxLeaderAliveInterval: 2 * time.Second,
-			OnLeaderDown: func(leader Info, lastReceivedBeat time.Time) {
+			OnLeaderDown: func(leader NodeInfo, lastReceivedBeat time.Time) {
 				leaderDownTriggered = true
 			},
 		}
