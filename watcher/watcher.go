@@ -77,10 +77,10 @@ func (w *Watcher) onNoReceivedHeartBeat() {
 	}
 }
 
-func (w *Watcher) RegisterNode(n *NodeInfo, key string) error {
+func (w *Watcher) RegisterNode(n *NodeInfo, key string) ([]*NodeInfo, error) {
 	if key != w.registrationKey {
-		return errors.New("invalid registration key")
+		return nil, errors.New("invalid registration key")
 	}
 	w.nodes = append(w.nodes, n)
-	return nil
+	return w.nodes, nil
 }
