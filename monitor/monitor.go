@@ -43,6 +43,7 @@ func (m *Monitor) StartHeartBeating() {
 	m.heartBeatLock.Lock()
 
 	if m.isHeartBeating {
+		m.heartBeatLock.Unlock()
 		return
 	}
 	m.isHeartBeating = true

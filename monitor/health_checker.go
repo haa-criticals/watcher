@@ -27,6 +27,7 @@ func (c *healthChecker) Start() {
 	}
 	c.locker.Lock()
 	if c.active {
+		c.locker.Unlock()
 		return
 	}
 	c.active = true
