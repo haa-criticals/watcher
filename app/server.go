@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"github.com.haa-criticals/watcher/monitor"
+	"github.com.haa-criticals/watcher/watcher"
 	"net"
 
 	"google.golang.org/grpc"
@@ -21,8 +22,8 @@ func New(monitor *monitor.Monitor) *App {
 	}
 }
 
-func (a *App) Register(ctx context.Context, in *pb.RegisterRequest) (*pb.RegisterResponse, error) {
-	a.monitor.RegisterWatcher(&monitor.Watcher{BaseURL: in.Address})
+func (a *App) Register(_ context.Context, in *pb.RegisterRequest) (*pb.RegisterResponse, error) {
+	a.monitor.RegisterWatcher(&watcher.Info{BaseURL: in.Address})
 	return &pb.RegisterResponse{
 		Success: true,
 	}, nil

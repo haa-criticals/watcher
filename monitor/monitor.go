@@ -5,16 +5,18 @@ import (
 	"log"
 	"sync"
 	"time"
+
+	"github.com.haa-criticals/watcher/watcher"
 )
 
 type ErrorHandler interface {
-	OnHeartBeatError(err error, watcher *Watcher)
+	OnHeartBeatError(err error, watcher *watcher.Info)
 	OnHealthCheckError(err error)
 }
 
 type defaultErrorHandler struct{}
 
-func (d *defaultErrorHandler) OnHeartBeatError(err error, watcher *Watcher) {
+func (d *defaultErrorHandler) OnHeartBeatError(err error, watcher *watcher.Info) {
 	log.Printf("error sending heart Beat to %s: %v", watcher.BaseURL, err)
 }
 
@@ -22,14 +24,10 @@ func (d *defaultErrorHandler) OnHealthCheckError(err error) {
 	log.Printf("error sending health check: %v", err)
 }
 
-type Watcher struct {
-	BaseURL string
-}
-
 type Monitor struct {
 	errorHandler      ErrorHandler
 	notifier          Notifier
-	watchers          []*Watcher
+	watchers          []*watcher.Info
 	healthChecker     *healthChecker
 	doneHeartBeat     chan struct{}
 	isHeartBeating    bool
@@ -37,7 +35,7 @@ type Monitor struct {
 	heartBeatInterval time.Duration
 }
 
-func (m *Monitor) RegisterWatcher(watcher *Watcher) {
+func (m *Monitor) RegisterWatcher(watcher *watcher.Info) {
 	m.watchers = append(m.watchers, watcher)
 }
 
@@ -72,14 +70,14 @@ func (m *Monitor) heartBeat() error {
 
 	wg := &sync.WaitGroup{}
 	wg.Add(len(m.watchers))
-	for _, watcher := range m.watchers {
-		go m.sendBeatToWatcher(wg, watcher)
+	for _, w := range m.watchers {
+		go m.sendBeatToWatcher(wg, w)
 	}
 	wg.Wait()
 	return nil
 }
 
-func (m *Monitor) sendBeatToWatcher(wg *sync.WaitGroup, watcher *Watcher) {
+func (m *Monitor) sendBeatToWatcher(wg *sync.WaitGroup, watcher *watcher.Info) {
 	defer wg.Done()
 	err := m.notifier.Beat(watcher.BaseURL)
 	if err != nil {
