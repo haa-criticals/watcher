@@ -149,4 +149,16 @@ func TestWatcher(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, 3, len(nodes))
 	})
+
+	t.Run("An id should be set on node registration", func(t *testing.T) {
+		w := &Watcher{
+			registrationKey: "key",
+		}
+		info := &NodeInfo{BaseURL: "http://localhost:8080"}
+
+		nodes, err := w.RegisterNode(info, "key")
+		assert.NoError(t, err)
+		assert.Equal(t, 1, len(nodes))
+		assert.NotEmpty(t, info.ID)
+	})
 }

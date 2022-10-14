@@ -2,12 +2,14 @@ package watcher
 
 import (
 	"errors"
+	"github.com/google/uuid"
 	"log"
 	"sync"
 	"time"
 )
 
 type NodeInfo struct {
+	ID      uuid.UUID
 	BaseURL string
 }
 
@@ -81,6 +83,7 @@ func (w *Watcher) RegisterNode(n *NodeInfo, key string) ([]*NodeInfo, error) {
 	if key != w.registrationKey {
 		return nil, errors.New("invalid registration key")
 	}
+	n.ID = uuid.New()
 	w.nodes = append(w.nodes, n)
 	return w.nodes, nil
 }
