@@ -76,4 +76,24 @@ func TestWatcher(t *testing.T) {
 		time.Sleep(3 * time.Second)
 		assert.Equal(t, 0, leaderDownTriggeredCount)
 	})
+
+	t.Run("Should not notify leader down if stopped checking heart beat", func(t *testing.T) {
+		leaderDownTriggered := false
+		w := &Watcher{
+			lastReceivedBeat:       time.Now(),
+			leader:                 &NodeInfo{},
+			checkHeartBeatInterval: 2 * time.Second,
+			maxLeaderAliveInterval: 2 * time.Second,
+			doneHeartBeatChecking:  make(chan struct{}),
+			OnLeaderDown: func(leader *NodeInfo, lastReceivedBeat time.Time) {
+				leaderDownTriggered = true
+			},
+		}
+
+		go w.StartHeartBeatChecking()
+		time.Sleep(time.Second)
+		w.StopHeartBeatChecking()
+		time.Sleep(2 * time.Second)
+		assert.False(t, leaderDownTriggered)
+	})
 }
