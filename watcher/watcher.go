@@ -9,8 +9,9 @@ import (
 )
 
 type NodeInfo struct {
-	ID      uuid.UUID
-	BaseURL string
+	ID            uuid.UUID
+	BaseURL       string
+	electionState electionState
 }
 
 type Watcher struct {
