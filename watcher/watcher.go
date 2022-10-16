@@ -13,6 +13,7 @@ type NodeInfo struct {
 	BaseURL       string
 	electionState electionState
 	priority      int
+	electionVote  uuid.UUID
 }
 
 type Watcher struct {

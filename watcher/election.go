@@ -51,14 +51,13 @@ func (e *Election) CheckNodesAccepted() bool {
 	return true
 }
 
-func (e *Election) WaitConclusion() {
+func (e *Election) WaitRegistration() {
 	t := time.Tick(1 * time.Second)
 	for {
 		select {
 		case <-t:
 			if e.checkNodesRegistered() {
 				e.newLeader = e.getHighestPriority()
-				e.OnNewLeaderElect(e.newLeader)
 				e.state = registered
 				return
 			}
@@ -92,4 +91,51 @@ func (e *Election) getHighestPriority() *NodeInfo {
 		}
 	}
 	return highest
+}
+
+func (e *Election) WaitVotes() {
+	t := time.Tick(1 * time.Second)
+	for {
+		select {
+		case <-t:
+			if e.checkNodesVoted() {
+				e.newLeader = e.getMostVoted()
+				e.OnNewLeaderElect(e.newLeader)
+				e.state = voted
+				return
+			}
+		}
+	}
+}
+
+func (e *Election) checkNodesVoted() bool {
+	for _, n := range e.nodes {
+		if n.electionState != voted {
+			return false
+		}
+	}
+	return true
+}
+
+func (e *Election) ReceiveVote(id uuid.UUID, vote uuid.UUID) {
+	for _, n := range e.nodes {
+		if n.ID == id {
+			n.electionVote = vote
+			n.electionState = voted
+		}
+	}
+}
+
+func (e *Election) getMostVoted() *NodeInfo {
+	votes := make(map[uuid.UUID]int)
+	for _, n := range e.nodes {
+		votes[n.electionVote]++
+	}
+	var mostVoted *NodeInfo
+	for _, n := range e.nodes {
+		if mostVoted == nil || votes[n.ID] > votes[mostVoted.electionVote] {
+			mostVoted = n
+		}
+	}
+	return mostVoted
 }
