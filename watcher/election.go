@@ -11,6 +11,7 @@ type electionState int
 const (
 	requested electionState = iota
 	accepted
+	registered
 	voted
 	finished
 )
@@ -55,34 +56,35 @@ func (e *Election) WaitConclusion() {
 	for {
 		select {
 		case <-t:
-			if e.checkNodesVoted() {
-				e.newLeader = e.GetHighestPriority()
+			if e.checkNodesRegistered() {
+				e.newLeader = e.getHighestPriority()
 				e.OnNewLeaderElect(e.newLeader)
+				e.state = registered
 				return
 			}
 		}
 	}
 }
 
-func (e *Election) ReceiveVote(id uuid.UUID, priority int) {
+func (e *Election) ReceivePriority(id uuid.UUID, priority int) {
 	for _, n := range e.nodes {
 		if n.ID == id {
-			n.electionState = voted
+			n.electionState = registered
 			n.priority = priority
 		}
 	}
 }
 
-func (e *Election) checkNodesVoted() bool {
+func (e *Election) checkNodesRegistered() bool {
 	for _, n := range e.nodes {
-		if n.electionState != voted {
+		if n.electionState != registered {
 			return false
 		}
 	}
 	return true
 }
 
-func (e *Election) GetHighestPriority() *NodeInfo {
+func (e *Election) getHighestPriority() *NodeInfo {
 	var highest *NodeInfo
 	for _, n := range e.nodes {
 		if highest == nil || n.priority > highest.priority {

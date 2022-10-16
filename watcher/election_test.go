@@ -47,7 +47,7 @@ func TestElection(t *testing.T) {
 		assert.True(t, started)
 	})
 
-	t.Run("Should wait until all nodes has voted to elect a new leader", func(t *testing.T) {
+	t.Run("Should wait until all nodes has registered to elect a new leader", func(t *testing.T) {
 		nodes := []*NodeInfo{
 			{ID: uuid.UUID{}, BaseURL: "locahost:50051", electionState: accepted},
 			{ID: uuid.UUID{}, BaseURL: "locahost:50052", electionState: accepted},
@@ -62,15 +62,41 @@ func TestElection(t *testing.T) {
 		assert.Nil(t, e.newLeader)
 		assert.False(t, newLeaderElect)
 		time.Sleep(1 * time.Second)
-		e.ReceiveVote(nodes[0].ID, 2)
-		e.ReceiveVote(nodes[1].ID, 2)
+		e.ReceivePriority(nodes[0].ID, 2)
+		e.ReceivePriority(nodes[1].ID, 2)
 		assert.False(t, newLeaderElect)
 		assert.Nil(t, e.newLeader)
 		time.Sleep(1 * time.Second)
-		e.ReceiveVote(nodes[2].ID, 1)
+		e.ReceivePriority(nodes[2].ID, 1)
 		time.Sleep(2 * time.Second)
 		assert.True(t, newLeaderElect)
 		assert.NotNil(t, e.newLeader)
 	})
 
+	t.Run("Should elect the node with the highest priority", func(t *testing.T) {
+		nodes := []*NodeInfo{
+			{ID: uuid.UUID{}, BaseURL: "locahost:50051", electionState: accepted},
+			{ID: uuid.UUID{}, BaseURL: "locahost:50052", electionState: accepted},
+			{ID: uuid.UUID{}, BaseURL: "locahost:50053", electionState: accepted},
+		}
+		e := New(nodes)
+		newLeaderElect := false
+		e.OnNewLeaderElect = func(node *NodeInfo) {
+			newLeaderElect = true
+		}
+		go e.WaitConclusion()
+		assert.Nil(t, e.newLeader)
+		assert.False(t, newLeaderElect)
+		time.Sleep(1 * time.Second)
+		e.ReceivePriority(nodes[0].ID, 2)
+		e.ReceivePriority(nodes[1].ID, 1)
+		assert.False(t, newLeaderElect)
+		assert.Nil(t, e.newLeader)
+		time.Sleep(1 * time.Second)
+		e.ReceivePriority(nodes[2].ID, 1)
+		time.Sleep(2 * time.Second)
+		assert.True(t, newLeaderElect)
+		assert.NotNil(t, e.newLeader)
+		assert.Equal(t, e.newLeader, nodes[0])
+	})
 }
