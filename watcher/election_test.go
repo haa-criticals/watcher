@@ -29,4 +29,20 @@ func TestElection(t *testing.T) {
 			assert.Equal(t, err.Error(), "not all nodes accepted election yet")
 		}
 	})
+
+	t.Run("Should start election", func(t *testing.T) {
+		nodes := []*NodeInfo{
+			{ID: uuid.UUID{}, BaseURL: "locahost:50051", electionState: accepted},
+			{ID: uuid.UUID{}, BaseURL: "locahost:50052", electionState: accepted},
+			{ID: uuid.UUID{}, BaseURL: "locahost:50053", electionState: accepted},
+		}
+		e := New(nodes)
+		started := false
+		e.OnStartElection = func(nodes []*NodeInfo) {
+			started = true
+		}
+		err := e.Start()
+		assert.NoError(t, err)
+		assert.True(t, started)
+	})
 }

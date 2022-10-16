@@ -14,8 +14,9 @@ const (
 )
 
 type Election struct {
-	nodes []*NodeInfo
-	state electionState
+	nodes           []*NodeInfo
+	state           electionState
+	OnStartElection func(nodes []*NodeInfo)
 }
 
 func New(nodes []*NodeInfo) *Election {
@@ -31,7 +32,8 @@ func (e *Election) Start() error {
 	if !e.CheckNodesAccepted() {
 		return errors.New("not all nodes accepted election yet")
 	}
-
+	e.state = voting
+	e.OnStartElection(e.nodes)
 	return nil
 }
 
