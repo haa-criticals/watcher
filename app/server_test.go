@@ -2,7 +2,7 @@ package app
 
 import (
 	"context"
-	"github.com.haa-criticals/watcher/monitor"
+	"github.com.haa-criticals/watcher/watcher"
 	"testing"
 
 	"google.golang.org/grpc"
@@ -15,7 +15,7 @@ import (
 
 func TestRegisterWatcher(t *testing.T) {
 	t.Run("should register watcher", func(t *testing.T) {
-		server := New(&monitor.Monitor{})
+		server := New(&watcher.Watcher{}, 50051)
 		go func() {
 			err := server.StartServer()
 			if err != nil {

@@ -2,7 +2,9 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"github.com.haa-criticals/watcher/watcher"
+	"log"
 	"net"
 
 	"google.golang.org/grpc"
@@ -13,11 +15,13 @@ import (
 type App struct {
 	pb.UnimplementedWatcherServer
 	watcher *watcher.Watcher
+	port    int
 }
 
-func New(watcher *watcher.Watcher) *App {
+func New(watcher *watcher.Watcher, port int) *App {
 	return &App{
 		watcher: watcher,
+		port:    port,
 	}
 }
 
@@ -43,7 +47,8 @@ func (a *App) Register(_ context.Context, in *pb.RegisterRequest) (*pb.RegisterR
 }
 
 func (a *App) StartServer() error {
-	listen, err := net.Listen("tcp", ":50051")
+	listen, err := net.Listen("tcp", fmt.Sprintf(":%d", a.port))
+	log.Println("Starting watcher server on port", a.port)
 	if err != nil {
 		return err
 	}

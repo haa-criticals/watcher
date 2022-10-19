@@ -12,7 +12,9 @@ import (
 )
 
 var (
-	cfgFile    string
+	cfgFile string
+	port    int
+
 	watch      bool
 	provider   string
 	baseUrl    string
@@ -36,8 +38,7 @@ to quickly create a Cobra application.`,
 	// has an action associated with it:
 	Run: func(cmd *cobra.Command, args []string) {
 		w := watcher.New()
-		a := app.New(w)
-		log.Printf("Starting watcher")
+		a := app.New(w, port)
 		if err := a.StartServer(); err != nil {
 			log.Fatalf("Error starting server: %v", err)
 		}
@@ -57,12 +58,13 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "c", "config file (default is $HOME/.watcher.yaml)")
-	rootCmd.PersistentFlags().StringVarP(&provider, "provider", "p", "gitlab", "The provisioner  provider to use, available options are: gitlab")
+	rootCmd.PersistentFlags().StringVar(&provider, "provider", "gitlab", "The provisioner  provider to use, available options are: gitlab")
 	rootCmd.PersistentFlags().StringVarP(&baseUrl, "base-url", "b", "", "The base url of the provisioner's provider")
 	rootCmd.PersistentFlags().StringVarP(&token, "token", "t", "", "The token to use to authenticate with the provisioner's provider")
 	rootCmd.PersistentFlags().Int64VarP(&projectId, "project-id", "i", 0, "The project id to use to authenticate with the provisioner's provider")
 	rootCmd.PersistentFlags().StringVarP(&projectRef, "project-ref", "r", "main", "The project ref to use with the provisioner's provider")
 	rootCmd.PersistentFlags().StringToStringVarP(&variables, "variables", "v", nil, "The variables to use with the provisioner's provider")
+	rootCmd.Flags().IntVarP(&port, "port", "p", 8080, "The port to use to serve")
 	_ = rootCmd.MarkFlagRequired("base-url")
 	_ = rootCmd.MarkFlagRequired("token")
 	_ = rootCmd.MarkFlagRequired("project-id")
