@@ -11,7 +11,7 @@ import (
 func TestElection(t *testing.T) {
 	t.Run("Should have at least one node to start election", func(t *testing.T) {
 		var nodes []*NodeInfo
-		e := New(nodes)
+		e := NewElection(nodes)
 		err := e.Start()
 		if assert.Error(t, err) {
 			assert.Equal(t, err.Error(), "no nodes to start election")
@@ -24,7 +24,7 @@ func TestElection(t *testing.T) {
 			{ID: uuid.UUID{}, BaseURL: "locahost:50052"},
 			{ID: uuid.UUID{}, BaseURL: "locahost:50053"},
 		}
-		e := New(nodes)
+		e := NewElection(nodes)
 		err := e.Start()
 		if assert.Error(t, err) {
 			assert.Equal(t, err.Error(), "not all nodes accepted election yet")
@@ -37,7 +37,7 @@ func TestElection(t *testing.T) {
 			{ID: uuid.UUID{}, BaseURL: "locahost:50052", electionState: accepted},
 			{ID: uuid.UUID{}, BaseURL: "locahost:50053", electionState: accepted},
 		}
-		e := New(nodes)
+		e := NewElection(nodes)
 		started := false
 		e.OnStartElection = func(nodes []*NodeInfo) {
 			started = true
@@ -53,7 +53,7 @@ func TestElection(t *testing.T) {
 			{ID: uuid.UUID{}, BaseURL: "locahost:50052", electionState: accepted},
 			{ID: uuid.UUID{}, BaseURL: "locahost:50053", electionState: accepted},
 		}
-		e := New(nodes)
+		e := NewElection(nodes)
 		go e.WaitRegistration()
 		assert.Nil(t, e.newLeader)
 		time.Sleep(1 * time.Second)
@@ -72,7 +72,7 @@ func TestElection(t *testing.T) {
 			{ID: uuid.UUID{}, BaseURL: "locahost:50052", electionState: accepted},
 			{ID: uuid.UUID{}, BaseURL: "locahost:50053", electionState: accepted},
 		}
-		e := New(nodes)
+		e := NewElection(nodes)
 		go e.WaitRegistration()
 		assert.Nil(t, e.newLeader)
 		time.Sleep(1 * time.Second)
@@ -92,7 +92,7 @@ func TestElection(t *testing.T) {
 			{ID: uuid.UUID{}, BaseURL: "locahost:50052", electionState: accepted},
 			{ID: uuid.UUID{}, BaseURL: "locahost:50053", electionState: accepted},
 		}
-		e := New(nodes)
+		e := NewElection(nodes)
 		newLeaderElect := false
 		e.OnNewLeaderElect = func(node *NodeInfo) {
 			newLeaderElect = true

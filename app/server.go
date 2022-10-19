@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"github.com.haa-criticals/watcher/monitor"
 	"github.com.haa-criticals/watcher/watcher"
 	"net"
 
@@ -13,19 +12,33 @@ import (
 
 type App struct {
 	pb.UnimplementedWatcherServer
-	monitor *monitor.Monitor
+	watcher *watcher.Watcher
 }
 
-func New(monitor *monitor.Monitor) *App {
+func New(watcher *watcher.Watcher) *App {
 	return &App{
-		monitor: monitor,
+		watcher: watcher,
 	}
 }
 
 func (a *App) Register(_ context.Context, in *pb.RegisterRequest) (*pb.RegisterResponse, error) {
-	a.monitor.RegisterWatcher(&watcher.NodeInfo{BaseURL: in.Address})
+	nodeInfo := &watcher.NodeInfo{BaseURL: in.Address}
+	nodes, err := a.watcher.RegisterNode(nodeInfo, in.Key)
+	if err != nil {
+		return &pb.RegisterResponse{
+			Success: false,
+		}, err
+	}
+
+	nodesAddress := make([]string, len(nodes))
+	for i, n := range nodes {
+		nodesAddress[i] = n.BaseURL
+	}
+
 	return &pb.RegisterResponse{
 		Success: true,
+		Id:      nodeInfo.ID.String(),
+		Nodes:   nodesAddress,
 	}, nil
 }
 

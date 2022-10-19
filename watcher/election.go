@@ -24,7 +24,7 @@ type Election struct {
 	newLeader        *NodeInfo
 }
 
-func New(nodes []*NodeInfo) *Election {
+func NewElection(nodes []*NodeInfo) *Election {
 	return &Election{
 		nodes: nodes,
 		state: requested,

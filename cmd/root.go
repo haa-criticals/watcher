@@ -2,11 +2,13 @@ package cmd
 
 import (
 	"fmt"
+	"github.com.haa-criticals/watcher/watcher"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"log"
 	"os"
 
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
+	"github.com.haa-criticals/watcher/app"
 )
 
 var (
@@ -32,9 +34,14 @@ This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
-	// Run: func(cmd *cobra.Command, args []string) {
-	//	log.Printf("Watcher called with args: %v", args)
-	//},
+	Run: func(cmd *cobra.Command, args []string) {
+		w := watcher.New()
+		a := app.New(w)
+		log.Printf("Starting watcher")
+		if err := a.StartServer(); err != nil {
+			log.Fatalf("Error starting server: %v", err)
+		}
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

@@ -31,6 +31,15 @@ type Watcher struct {
 	registrationKey                   string
 }
 
+func New() *Watcher {
+	return &Watcher{
+		checkHeartBeatInterval:            1 * time.Second,
+		maxLeaderAliveInterval:            5 * time.Second,
+		minLeaderDownNotificationInterval: 5 * time.Second,
+		doneHeartBeatChecking:             make(chan struct{}),
+	}
+}
+
 func (w *Watcher) StartHeartBeatChecking() {
 	if w.leader == nil {
 		log.Println("There is no elected leader, can't start heart beat checking")
