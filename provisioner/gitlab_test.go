@@ -2,10 +2,13 @@ package provisioner
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 type gitlabRequest struct {
@@ -15,8 +18,9 @@ type gitlabRequest struct {
 }
 
 type gitlabMock struct {
-	server   *http.Server
-	requests []gitlabRequest
+	server     *http.Server
+	requests   []gitlabRequest
+	pipelineId int
 }
 
 func (g *gitlabMock) init() error {
@@ -25,10 +29,25 @@ func (g *gitlabMock) init() error {
 		projectId := strings.Split(r.URL.Path, "/")[4]
 		g.requests = append(g.requests, gitlabRequest{
 			projectId: projectId,
-			action:    r.FormValue("ACTION"),
+			action:    r.FormValue("variables[ACTION]"),
 			variables: r.PostForm,
 		})
 		w.WriteHeader(http.StatusCreated)
+		g.pipelineId++
+		pId, _ := strconv.Atoi(projectId)
+		response := pipeline{
+			Id:        g.pipelineId,
+			Iid:       g.pipelineId,
+			ProjectId: pId,
+			Sha:       "Sha-256",
+			Ref:       "ref",
+			Status:    "Created",
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+			WebUrl:    "",
+		}
+		m, _ := json.Marshal(response)
+		_, _ = w.Write(m)
 	})
 	g.server = &http.Server{Addr: ":3580", Handler: mux}
 	return g.server.ListenAndServe()
@@ -67,7 +86,7 @@ func TestGitlabProvider(t *testing.T) {
 
 		requestReceived := false
 		for _, request := range g.requests {
-			if request.variables.Get("Variables[requestId]") != "1" {
+			if request.variables.Get("variables[requestId]") != "1" {
 				continue
 			}
 
@@ -117,7 +136,7 @@ func TestGitlabProvider(t *testing.T) {
 
 		requestReceived := false
 		for _, request := range g.requests {
-			if request.variables.Get("Variables[requestId]") != "2" {
+			if request.variables.Get("variables[requestId]") != "2" {
 				continue
 			}
 
