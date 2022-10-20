@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"github.com.haa-criticals/watcher/monitor"
 	"github.com.haa-criticals/watcher/watcher"
 	"testing"
 
@@ -10,14 +11,18 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	igrpc "github.com.haa-criticals/watcher/app/grpc"
 	"github.com.haa-criticals/watcher/app/grpc/pb"
 )
 
 func TestRegisterWatcher(t *testing.T) {
 	t.Run("should register watcher", func(t *testing.T) {
-		server := New(&watcher.Watcher{}, 50051)
+		config := &Config{
+			Port: 50051,
+		}
+		server := New(watcher.New(igrpc.NewWatchClient("localhost:50051")), monitor.New(), config)
 		go func() {
-			err := server.StartServer()
+			err := server.Start()
 			if err != nil {
 				t.Errorf("failed to start server: %v", err)
 			}

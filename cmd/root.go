@@ -2,18 +2,24 @@ package cmd
 
 import (
 	"fmt"
+	"github.com.haa-criticals/watcher/app/grpc"
+	"github.com.haa-criticals/watcher/monitor"
 	"github.com.haa-criticals/watcher/watcher"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"log"
 	"os"
+	"time"
 
 	"github.com.haa-criticals/watcher/app"
 )
 
 var (
-	cfgFile string
-	port    int
+	cfgFile  string
+	port     int
+	leader   bool
+	endpoint string
+	url      string
 
 	watch      bool
 	provider   string
@@ -37,9 +43,19 @@ to quickly create a Cobra application.`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	Run: func(cmd *cobra.Command, args []string) {
-		w := watcher.New()
-		a := app.New(w, port)
-		if err := a.StartServer(); err != nil {
+		w := watcher.New(
+			grpc.NewWatchClient(url),
+		)
+		m := monitor.New(
+			monitor.WithHeartBeat(grpc.NewNotifier(), 5*time.Second),
+			monitor.WithHealthCheck("https://www.google.com", 5*time.Second, 3),
+		)
+		a := app.New(w, m, &app.Config{
+			Port:           port,
+			Leader:         leader,
+			LeaderEndpoint: endpoint,
+		})
+		if err := a.Start(); err != nil {
 			log.Fatalf("Error starting server: %v", err)
 		}
 	},
@@ -65,6 +81,9 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&projectRef, "project-ref", "r", "main", "The project ref to use with the provisioner's provider")
 	rootCmd.PersistentFlags().StringToStringVarP(&variables, "variables", "v", nil, "The variables to use with the provisioner's provider")
 	rootCmd.Flags().IntVarP(&port, "port", "p", 8080, "The port to use to serve")
+	rootCmd.Flags().BoolVarP(&leader, "leader", "l", false, "Determine if this watcher is the leader")
+	rootCmd.Flags().StringVarP(&endpoint, "endpoint", "e", "localhost:50051", "The endpoint to use to connect to the leader")
+	rootCmd.Flags().StringVarP(&url, "url", "u", "localhost:8080", "The url to use to connect to this watcher")
 	_ = rootCmd.MarkFlagRequired("base-url")
 	_ = rootCmd.MarkFlagRequired("token")
 	_ = rootCmd.MarkFlagRequired("project-id")

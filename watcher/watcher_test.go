@@ -119,9 +119,9 @@ func TestWatcher(t *testing.T) {
 		w := &Watcher{
 			registrationKey: "key",
 		}
-		_, err := w.RegisterNode(&NodeInfo{BaseURL: "http://localhost:8080"}, "key")
+		_, err := w.RegisterNode(&NodeInfo{Address: "http://localhost:8080"}, "key")
 		assert.NoError(t, err)
-		_, err = w.RegisterNode(&NodeInfo{BaseURL: "http://localhost:8081"}, "key")
+		_, err = w.RegisterNode(&NodeInfo{Address: "http://localhost:8081"}, "key")
 		assert.NoError(t, err)
 		assert.Equal(t, 2, len(w.nodes))
 	})
@@ -130,7 +130,7 @@ func TestWatcher(t *testing.T) {
 		w := &Watcher{
 			registrationKey: "key",
 		}
-		_, err := w.RegisterNode(&NodeInfo{BaseURL: "http://localhost:8080"}, "key1")
+		_, err := w.RegisterNode(&NodeInfo{Address: "http://localhost:8080"}, "key1")
 		assert.Error(t, err)
 		assert.Equal(t, 0, len(w.nodes))
 	})
@@ -139,13 +139,13 @@ func TestWatcher(t *testing.T) {
 		w := &Watcher{
 			registrationKey: "key",
 		}
-		nodes, err := w.RegisterNode(&NodeInfo{BaseURL: "http://localhost:8080"}, "key")
+		nodes, err := w.RegisterNode(&NodeInfo{Address: "http://localhost:8080"}, "key")
 		assert.NoError(t, err)
 		assert.Equal(t, 1, len(nodes))
-		nodes, err = w.RegisterNode(&NodeInfo{BaseURL: "http://localhost:8081"}, "key")
+		nodes, err = w.RegisterNode(&NodeInfo{Address: "http://localhost:8081"}, "key")
 		assert.NoError(t, err)
 		assert.Equal(t, 2, len(nodes))
-		nodes, err = w.RegisterNode(&NodeInfo{BaseURL: "http://localhost:8082"}, "key")
+		nodes, err = w.RegisterNode(&NodeInfo{Address: "http://localhost:8082"}, "key")
 		assert.NoError(t, err)
 		assert.Equal(t, 3, len(nodes))
 	})
@@ -154,7 +154,7 @@ func TestWatcher(t *testing.T) {
 		w := &Watcher{
 			registrationKey: "key",
 		}
-		info := &NodeInfo{BaseURL: "http://localhost:8080"}
+		info := &NodeInfo{Address: "http://localhost:8080"}
 
 		nodes, err := w.RegisterNode(info, "key")
 		assert.NoError(t, err)

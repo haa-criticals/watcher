@@ -1,6 +1,7 @@
 package watcher
 
 import (
+	"context"
 	"errors"
 	"github.com/google/uuid"
 	"log"
@@ -10,7 +11,7 @@ import (
 
 type NodeInfo struct {
 	ID            uuid.UUID
-	BaseURL       string
+	Address       string
 	electionState electionState
 	priority      int
 	electionVote  uuid.UUID
@@ -29,10 +30,12 @@ type Watcher struct {
 	OnLeaderDown                      func(info *NodeInfo, lastReceivedBeat time.Time)
 	nodes                             []*NodeInfo
 	registrationKey                   string
+	client                            Client
 }
 
-func New() *Watcher {
+func New(client Client) *Watcher {
 	return &Watcher{
+		client:                            client,
 		checkHeartBeatInterval:            1 * time.Second,
 		maxLeaderAliveInterval:            5 * time.Second,
 		minLeaderDownNotificationInterval: 5 * time.Second,
@@ -98,4 +101,23 @@ func (w *Watcher) RegisterNode(n *NodeInfo, key string) ([]*NodeInfo, error) {
 	n.ID = uuid.New()
 	w.nodes = append(w.nodes, n)
 	return w.nodes, nil
+}
+
+func (w *Watcher) RequestRegister(endpoint, key string) error {
+	log.Printf("Requesting registration to %s", endpoint)
+	res, err := w.client.RequestRegister(context.Background(), endpoint, key)
+	if err != nil {
+		return err
+	}
+	if !res.Success {
+		return errors.New("failed to register node")
+	}
+
+	w.nodes = make([]*NodeInfo, len(res.Nodes))
+
+	for _, n := range res.Nodes {
+		w.nodes = append(w.nodes, &NodeInfo{Address: n})
+	}
+	log.Printf("Registered to %s", endpoint)
+	return nil
 }

@@ -20,9 +20,9 @@ func TestElection(t *testing.T) {
 
 	t.Run("Should have received a accept election from all nodes before start the election", func(t *testing.T) {
 		nodes := []*NodeInfo{
-			{ID: uuid.UUID{}, BaseURL: "locahost:50051"},
-			{ID: uuid.UUID{}, BaseURL: "locahost:50052"},
-			{ID: uuid.UUID{}, BaseURL: "locahost:50053"},
+			{ID: uuid.UUID{}, Address: "locahost:50051"},
+			{ID: uuid.UUID{}, Address: "locahost:50052"},
+			{ID: uuid.UUID{}, Address: "locahost:50053"},
 		}
 		e := NewElection(nodes)
 		err := e.Start()
@@ -33,9 +33,9 @@ func TestElection(t *testing.T) {
 
 	t.Run("Should start election", func(t *testing.T) {
 		nodes := []*NodeInfo{
-			{ID: uuid.UUID{}, BaseURL: "locahost:50051", electionState: accepted},
-			{ID: uuid.UUID{}, BaseURL: "locahost:50052", electionState: accepted},
-			{ID: uuid.UUID{}, BaseURL: "locahost:50053", electionState: accepted},
+			{ID: uuid.UUID{}, Address: "locahost:50051", electionState: accepted},
+			{ID: uuid.UUID{}, Address: "locahost:50052", electionState: accepted},
+			{ID: uuid.UUID{}, Address: "locahost:50053", electionState: accepted},
 		}
 		e := NewElection(nodes)
 		started := false
@@ -49,9 +49,9 @@ func TestElection(t *testing.T) {
 
 	t.Run("Should wait until all nodes has registered to elect a new leader", func(t *testing.T) {
 		nodes := []*NodeInfo{
-			{ID: uuid.UUID{}, BaseURL: "locahost:50051", electionState: accepted},
-			{ID: uuid.UUID{}, BaseURL: "locahost:50052", electionState: accepted},
-			{ID: uuid.UUID{}, BaseURL: "locahost:50053", electionState: accepted},
+			{ID: uuid.UUID{}, Address: "locahost:50051", electionState: accepted},
+			{ID: uuid.UUID{}, Address: "locahost:50052", electionState: accepted},
+			{ID: uuid.UUID{}, Address: "locahost:50053", electionState: accepted},
 		}
 		e := NewElection(nodes)
 		go e.WaitRegistration()
@@ -68,9 +68,9 @@ func TestElection(t *testing.T) {
 
 	t.Run("Should elect the node with the highest priority", func(t *testing.T) {
 		nodes := []*NodeInfo{
-			{ID: uuid.UUID{}, BaseURL: "locahost:50051", electionState: accepted},
-			{ID: uuid.UUID{}, BaseURL: "locahost:50052", electionState: accepted},
-			{ID: uuid.UUID{}, BaseURL: "locahost:50053", electionState: accepted},
+			{ID: uuid.UUID{}, Address: "locahost:50051", electionState: accepted},
+			{ID: uuid.UUID{}, Address: "locahost:50052", electionState: accepted},
+			{ID: uuid.UUID{}, Address: "locahost:50053", electionState: accepted},
 		}
 		e := NewElection(nodes)
 		go e.WaitRegistration()
@@ -88,9 +88,9 @@ func TestElection(t *testing.T) {
 
 	t.Run("Should wait until all nodes has voted to elect a new leader", func(t *testing.T) {
 		nodes := []*NodeInfo{
-			{ID: uuid.UUID{}, BaseURL: "locahost:50051", electionState: accepted},
-			{ID: uuid.UUID{}, BaseURL: "locahost:50052", electionState: accepted},
-			{ID: uuid.UUID{}, BaseURL: "locahost:50053", electionState: accepted},
+			{ID: uuid.UUID{}, Address: "locahost:50051", electionState: accepted},
+			{ID: uuid.UUID{}, Address: "locahost:50052", electionState: accepted},
+			{ID: uuid.UUID{}, Address: "locahost:50053", electionState: accepted},
 		}
 		e := NewElection(nodes)
 		newLeaderElect := false

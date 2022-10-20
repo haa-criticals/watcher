@@ -17,7 +17,7 @@ type ErrorHandler interface {
 type defaultErrorHandler struct{}
 
 func (d *defaultErrorHandler) OnHeartBeatError(err error, watcher *watcher.NodeInfo) {
-	log.Printf("error sending heart Beat to %s: %v", watcher.BaseURL, err)
+	log.Printf("error sending heart Beat to %s: %v", watcher.Address, err)
 }
 
 func (d *defaultErrorHandler) OnHealthCheckError(err error) {
@@ -80,9 +80,9 @@ func (m *Monitor) heartBeat() error {
 
 func (m *Monitor) sendBeatToWatcher(wg *sync.WaitGroup, watcher *watcher.NodeInfo) {
 	defer wg.Done()
-	err := m.notifier.Beat(watcher.BaseURL)
+	err := m.notifier.Beat(watcher.Address)
 	if err != nil {
-		log.Printf("error sending heart Beat to %s: %v", watcher.BaseURL, err)
+		log.Printf("error sending heart Beat to %s: %v", watcher.Address, err)
 		m.errorHandler.OnHeartBeatError(err, watcher)
 	}
 }
