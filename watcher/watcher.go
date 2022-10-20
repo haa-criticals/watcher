@@ -10,11 +10,11 @@ import (
 )
 
 type NodeInfo struct {
-	ID            uuid.UUID
+	ID            string
 	Address       string
 	electionState electionState
 	priority      int
-	electionVote  uuid.UUID
+	electionVote  string
 }
 
 type Watcher struct {
@@ -98,7 +98,7 @@ func (w *Watcher) RegisterNode(n *NodeInfo, key string) ([]*NodeInfo, error) {
 	if key != w.registrationKey {
 		return nil, errors.New("invalid registration key")
 	}
-	n.ID = uuid.New()
+	n.ID = uuid.New().String()
 	w.nodes = append(w.nodes, n)
 	return w.nodes, nil
 }
@@ -116,7 +116,7 @@ func (w *Watcher) RequestRegister(endpoint, key string) error {
 	w.nodes = make([]*NodeInfo, len(res.Nodes))
 
 	for _, n := range res.Nodes {
-		w.nodes = append(w.nodes, &NodeInfo{Address: n})
+		w.nodes = append(w.nodes, &NodeInfo{Address: n.Address, ID: n.ID})
 	}
 	log.Printf("Registered to %s", endpoint)
 	return nil

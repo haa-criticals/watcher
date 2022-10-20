@@ -50,6 +50,7 @@ func TestWatcherClient(t *testing.T) {
 		assert.NotNil(t, r)
 		assert.True(t, r.Success)
 		assert.Equal(t, "123", r.Id)
+		s.GracefulStop()
 	})
 
 	t.Run("Should return all registered nodes", func(t *testing.T) {
@@ -60,7 +61,10 @@ func TestWatcherClient(t *testing.T) {
 				return &pb.RegisterResponse{
 					Success: true,
 					Id:      "123",
-					Nodes:   []string{"localhost:50051", "localhost:50052"},
+					Nodes: []*pb.Node{
+						{Address: "localhost:50051", Id: "123"},
+						{Address: "localhost:50052", Id: "124"},
+					},
 				}, nil
 			},
 		}
@@ -82,7 +86,12 @@ func TestWatcherClient(t *testing.T) {
 		assert.NotNil(t, r)
 		assert.True(t, r.Success)
 		assert.Equal(t, "123", r.Id)
-		assert.Equal(t, []string{"localhost:50051", "localhost:50052"}, r.Nodes)
+		assert.Equal(t, 2, len(r.Nodes))
+		assert.Equal(t, "localhost:50051", r.Nodes[0].Address)
+		assert.Equal(t, "123", r.Nodes[0].ID)
+		assert.Equal(t, "localhost:50052", r.Nodes[1].Address)
+		assert.Equal(t, "124", r.Nodes[1].ID)
+		s.GracefulStop()
 	})
 
 	t.Run("Should return error when watcher is not available", func(t *testing.T) {

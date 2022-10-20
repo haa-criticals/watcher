@@ -38,9 +38,14 @@ func (c *Client) RequestRegister(ctx context.Context, leaderAddress string, key 
 		return nil, err
 	}
 
+	nodes := make([]*watcher.NodeInfo, len(r.Nodes))
+	for i, n := range r.Nodes {
+		nodes[i] = &watcher.NodeInfo{Address: n.Address, ID: n.Id}
+	}
+
 	return &watcher.RegisterResponse{
 		Success: r.Success,
 		Id:      r.Id,
-		Nodes:   r.Nodes,
+		Nodes:   nodes,
 	}, nil
 }

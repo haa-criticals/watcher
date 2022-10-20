@@ -36,8 +36,9 @@ func New(watcher *watcher.Watcher, monitor *monitor.Monitor, config *Config) *Ap
 }
 
 func (a *App) Register(_ context.Context, in *pb.RegisterRequest) (*pb.RegisterResponse, error) {
+	log.Printf("Registering node  %s", in.Address)
 	nodeInfo := &watcher.NodeInfo{Address: in.Address}
-	nodes, err := a.watcher.RegisterNode(nodeInfo, in.Key)
+	registerdNodes, err := a.watcher.RegisterNode(nodeInfo, in.Key)
 	if err != nil {
 		return &pb.RegisterResponse{
 			Success: false,
@@ -45,15 +46,20 @@ func (a *App) Register(_ context.Context, in *pb.RegisterRequest) (*pb.RegisterR
 	}
 	a.monitor.RegisterWatcher(nodeInfo)
 
-	nodesAddress := make([]string, len(nodes))
-	for i, n := range nodes {
-		nodesAddress[i] = n.Address
+	nodes := make([]*pb.Node, len(registerdNodes))
+	for i, n := range registerdNodes {
+		nodes[i] = &pb.Node{
+			Id:      n.ID,
+			Address: n.Address,
+		}
 	}
+
+	log.Printf("Registered node %s", in.Address)
 
 	return &pb.RegisterResponse{
 		Success: true,
-		Id:      nodeInfo.ID.String(),
-		Nodes:   nodesAddress,
+		Id:      nodeInfo.ID,
+		Nodes:   nodes,
 	}, nil
 }
 

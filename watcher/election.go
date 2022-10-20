@@ -2,7 +2,6 @@ package watcher
 
 import (
 	"errors"
-	"github.com/google/uuid"
 	"time"
 )
 
@@ -65,7 +64,7 @@ func (e *Election) WaitRegistration() {
 	}
 }
 
-func (e *Election) ReceivePriority(id uuid.UUID, priority int) {
+func (e *Election) ReceivePriority(id string, priority int) {
 	for _, n := range e.nodes {
 		if n.ID == id {
 			n.electionState = registered
@@ -117,7 +116,7 @@ func (e *Election) checkNodesVoted() bool {
 	return true
 }
 
-func (e *Election) ReceiveVote(id uuid.UUID, vote uuid.UUID) {
+func (e *Election) ReceiveVote(id string, vote string) {
 	for _, n := range e.nodes {
 		if n.ID == id {
 			n.electionVote = vote
@@ -127,7 +126,7 @@ func (e *Election) ReceiveVote(id uuid.UUID, vote uuid.UUID) {
 }
 
 func (e *Election) getMostVoted() *NodeInfo {
-	votes := make(map[uuid.UUID]int)
+	votes := make(map[string]int)
 	for _, n := range e.nodes {
 		votes[n.electionVote]++
 	}

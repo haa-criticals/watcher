@@ -12,10 +12,15 @@ message RegisterRequest {
     string key = 2;
 }
 
+message Node {
+    string address = 1;
+    string id = 2;
+}
+
 message RegisterResponse {
     bool success = 1;
     string id = 2;
-    repeated string nodes = 3;
+    repeated Node nodes = 3;
 }
 
 message Beat {
@@ -24,5 +29,6 @@ message Beat {
 
 service Watcher {
     rpc Register(RegisterRequest) returns (RegisterResponse) {}
+    rpc AckNode(Node) returns (Node) {}
     rpc Heartbeat(Beat) returns (google.protobuf.Empty) {}
 }

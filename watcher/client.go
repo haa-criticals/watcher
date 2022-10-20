@@ -5,7 +5,7 @@ import "context"
 type RegisterResponse struct {
 	Success bool
 	Id      string
-	Nodes   []string
+	Nodes   []*NodeInfo
 }
 
 type Client interface {
