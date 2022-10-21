@@ -27,8 +27,13 @@ message Beat {
     google.protobuf.Timestamp timestamp = 3;
 }
 
+message AckRequest {
+    string key = 1;
+    Node node = 2;
+}
+
 service Watcher {
     rpc Register(RegisterRequest) returns (RegisterResponse) {}
-    rpc AckNode(Node) returns (Node) {}
+    rpc AckNode(AckRequest) returns (Node) {}
     rpc Heartbeat(Beat) returns (google.protobuf.Empty) {}
 }

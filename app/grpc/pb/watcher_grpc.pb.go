@@ -24,7 +24,7 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type WatcherClient interface {
 	Register(ctx context.Context, in *RegisterRequest, opts ...grpc.CallOption) (*RegisterResponse, error)
-	AckNode(ctx context.Context, in *Node, opts ...grpc.CallOption) (*Node, error)
+	AckNode(ctx context.Context, in *AckRequest, opts ...grpc.CallOption) (*Node, error)
 	Heartbeat(ctx context.Context, in *Beat, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
@@ -45,7 +45,7 @@ func (c *watcherClient) Register(ctx context.Context, in *RegisterRequest, opts 
 	return out, nil
 }
 
-func (c *watcherClient) AckNode(ctx context.Context, in *Node, opts ...grpc.CallOption) (*Node, error) {
+func (c *watcherClient) AckNode(ctx context.Context, in *AckRequest, opts ...grpc.CallOption) (*Node, error) {
 	out := new(Node)
 	err := c.cc.Invoke(ctx, "/pb.Watcher/AckNode", in, out, opts...)
 	if err != nil {
@@ -68,7 +68,7 @@ func (c *watcherClient) Heartbeat(ctx context.Context, in *Beat, opts ...grpc.Ca
 // for forward compatibility
 type WatcherServer interface {
 	Register(context.Context, *RegisterRequest) (*RegisterResponse, error)
-	AckNode(context.Context, *Node) (*Node, error)
+	AckNode(context.Context, *AckRequest) (*Node, error)
 	Heartbeat(context.Context, *Beat) (*emptypb.Empty, error)
 	mustEmbedUnimplementedWatcherServer()
 }
@@ -80,7 +80,7 @@ type UnimplementedWatcherServer struct {
 func (UnimplementedWatcherServer) Register(context.Context, *RegisterRequest) (*RegisterResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Register not implemented")
 }
-func (UnimplementedWatcherServer) AckNode(context.Context, *Node) (*Node, error) {
+func (UnimplementedWatcherServer) AckNode(context.Context, *AckRequest) (*Node, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AckNode not implemented")
 }
 func (UnimplementedWatcherServer) Heartbeat(context.Context, *Beat) (*emptypb.Empty, error) {
@@ -118,7 +118,7 @@ func _Watcher_Register_Handler(srv interface{}, ctx context.Context, dec func(in
 }
 
 func _Watcher_AckNode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Node)
+	in := new(AckRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -130,7 +130,7 @@ func _Watcher_AckNode_Handler(srv interface{}, ctx context.Context, dec func(int
 		FullMethod: "/pb.Watcher/AckNode",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(WatcherServer).AckNode(ctx, req.(*Node))
+		return srv.(WatcherServer).AckNode(ctx, req.(*AckRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }

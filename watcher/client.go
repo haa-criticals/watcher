@@ -10,4 +10,5 @@ type RegisterResponse struct {
 
 type Client interface {
 	RequestRegister(ctx context.Context, address, key string) (*RegisterResponse, error)
+	AckNode(ctx context.Context, address, key string, node *NodeInfo) (*NodeInfo, error)
 }
