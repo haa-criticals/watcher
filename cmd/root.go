@@ -54,6 +54,7 @@ to quickly create a Cobra application.`,
 			Port:           port,
 			Leader:         leader,
 			LeaderEndpoint: endpoint,
+			Address:        url,
 		})
 		if err := a.Start(); err != nil {
 			log.Fatalf("Error starting server: %v", err)

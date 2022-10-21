@@ -18,6 +18,7 @@ type Config struct {
 	Leader         bool
 	LeaderEndpoint string
 	clusterKey     string
+	Address        string
 }
 
 type App struct {
@@ -28,6 +29,7 @@ type App struct {
 }
 
 func New(watcher *watcher.Watcher, monitor *monitor.Monitor, config *Config) *App {
+	watcher.Address = config.Address
 	return &App{
 		watcher: watcher,
 		monitor: monitor,
@@ -60,6 +62,20 @@ func (a *App) Register(_ context.Context, in *pb.RegisterRequest) (*pb.RegisterR
 		Success: true,
 		Id:      nodeInfo.ID,
 		Nodes:   nodes,
+	}, nil
+}
+
+func (a *App) AckNode(_ context.Context, in *pb.AckRequest) (*pb.Node, error) {
+	log.Printf("Acknowledging node %s", in.Node.Address)
+	nodeInfo := &watcher.NodeInfo{Address: in.Node.Address, ID: in.Node.Id}
+	err := a.watcher.AckNode(nodeInfo, in.Key)
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("Acknowledged node %s", in.Node.Address)
+	return &pb.Node{
+		Id:      a.watcher.ID,
+		Address: a.watcher.Address,
 	}, nil
 }
 
