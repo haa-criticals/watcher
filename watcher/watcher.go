@@ -115,6 +115,10 @@ func (w *Watcher) RequestRegister(endpoint, key string) error {
 		return errors.New("failed to register node")
 	}
 
+	w.leader = &NodeInfo{
+		Address: endpoint,
+	}
+
 	for _, n := range res.Nodes {
 		if n.Address == w.Address {
 			continue

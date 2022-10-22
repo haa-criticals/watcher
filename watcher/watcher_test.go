@@ -1,11 +1,25 @@
 package watcher
 
 import (
+	"context"
 	"github.com/stretchr/testify/assert"
 	"sync"
 	"testing"
 	"time"
 )
+
+type mockWatcherClient struct {
+	fRequestRegister func(ctx context.Context, address, key string) (*RegisterResponse, error)
+	fAckNode         func(ctx context.Context, address, key string, node *NodeInfo) (*NodeInfo, error)
+}
+
+func (m *mockWatcherClient) RequestRegister(ctx context.Context, address, key string) (*RegisterResponse, error) {
+	return m.fRequestRegister(ctx, address, key)
+}
+
+func (m *mockWatcherClient) AckNode(ctx context.Context, address, key string, node *NodeInfo) (*NodeInfo, error) {
+	return m.fAckNode(ctx, address, key, node)
+}
 
 func TestWatcher(t *testing.T) {
 	t.Run("Should notify leader down after 3 seconds counting from last received beat", func(t *testing.T) {
@@ -151,5 +165,23 @@ func TestWatcher(t *testing.T) {
 		nodes, err = w.RegisterNode(&NodeInfo{Address: "http://localhost:8082"}, "key")
 		assert.NoError(t, err)
 		assert.Equal(t, 3, len(nodes))
+	})
+
+	t.Run("The leader should be set after requesting registration", func(t *testing.T) {
+		w := &Watcher{
+			registrationKey: "key",
+			registerLocker:  &sync.Mutex{},
+			client: &mockWatcherClient{
+				fRequestRegister: func(ctx context.Context, address, key string) (*RegisterResponse, error) {
+					return &RegisterResponse{
+						Success: true,
+						Nodes:   []*NodeInfo{{Address: "http://localhost:8081"}},
+					}, nil
+				},
+			},
+		}
+		err := w.RequestRegister("localhost:8080", "key")
+		assert.NoError(t, err)
+		assert.NotNil(t, w.leader)
 	})
 }
