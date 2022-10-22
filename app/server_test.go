@@ -32,7 +32,7 @@ func TestRegisterWatcher(t *testing.T) {
 		assert.NoError(t, err)
 		client := pb.NewWatcherClient(conn)
 
-		r, err := client.Register(context.Background(), &pb.RegisterRequest{})
+		r, err := client.Register(context.Background(), &pb.RegisterRequest{Address: "localhost:50052"})
 		assert.NoError(t, err)
 		assert.NotNil(t, r)
 		assert.True(t, r.Success)

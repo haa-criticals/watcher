@@ -19,9 +19,9 @@ func TestElection(t *testing.T) {
 
 	t.Run("Should have received a accept election from all nodes before start the election", func(t *testing.T) {
 		nodes := []*NodeInfo{
-			{ID: "123", Address: "locahost:50051"},
-			{ID: "124", Address: "locahost:50052"},
-			{ID: "125", Address: "locahost:50053"},
+			{Address: "locahost:50051"},
+			{Address: "locahost:50052"},
+			{Address: "locahost:50053"},
 		}
 		e := NewElection(nodes)
 		err := e.Start()
@@ -32,9 +32,9 @@ func TestElection(t *testing.T) {
 
 	t.Run("Should start election", func(t *testing.T) {
 		nodes := []*NodeInfo{
-			{ID: "123", Address: "locahost:50051", electionState: accepted},
-			{ID: "124", Address: "locahost:50052", electionState: accepted},
-			{ID: "125", Address: "locahost:50053", electionState: accepted},
+			{Address: "locahost:50051", electionState: accepted},
+			{Address: "locahost:50052", electionState: accepted},
+			{Address: "locahost:50053", electionState: accepted},
 		}
 		e := NewElection(nodes)
 		started := false
@@ -48,38 +48,38 @@ func TestElection(t *testing.T) {
 
 	t.Run("Should wait until all nodes has registered to elect a new leader", func(t *testing.T) {
 		nodes := []*NodeInfo{
-			{ID: "123", Address: "locahost:50051", electionState: accepted},
-			{ID: "124", Address: "locahost:50052", electionState: accepted},
-			{ID: "125", Address: "locahost:50053", electionState: accepted},
+			{Address: "locahost:50051", electionState: accepted},
+			{Address: "locahost:50052", electionState: accepted},
+			{Address: "locahost:50053", electionState: accepted},
 		}
 		e := NewElection(nodes)
 		go e.WaitRegistration()
 		assert.Nil(t, e.newLeader)
 		time.Sleep(1 * time.Second)
-		e.ReceivePriority(nodes[0].ID, 2)
-		e.ReceivePriority(nodes[1].ID, 2)
+		e.ReceivePriority(nodes[0].Address, 2)
+		e.ReceivePriority(nodes[1].Address, 2)
 		assert.Nil(t, e.newLeader)
 		time.Sleep(1 * time.Second)
-		e.ReceivePriority(nodes[2].ID, 1)
+		e.ReceivePriority(nodes[2].Address, 1)
 		time.Sleep(2 * time.Second)
 		assert.NotNil(t, e.newLeader)
 	})
 
 	t.Run("Should elect the node with the highest priority", func(t *testing.T) {
 		nodes := []*NodeInfo{
-			{ID: "123", Address: "locahost:50051", electionState: accepted},
-			{ID: "124", Address: "locahost:50052", electionState: accepted},
-			{ID: "125", Address: "locahost:50053", electionState: accepted},
+			{Address: "locahost:50051", electionState: accepted},
+			{Address: "locahost:50052", electionState: accepted},
+			{Address: "locahost:50053", electionState: accepted},
 		}
 		e := NewElection(nodes)
 		go e.WaitRegistration()
 		assert.Nil(t, e.newLeader)
 		time.Sleep(1 * time.Second)
-		e.ReceivePriority(nodes[0].ID, 2)
-		e.ReceivePriority(nodes[1].ID, 1)
+		e.ReceivePriority(nodes[0].Address, 2)
+		e.ReceivePriority(nodes[1].Address, 1)
 		assert.Nil(t, e.newLeader)
 		time.Sleep(1 * time.Second)
-		e.ReceivePriority(nodes[2].ID, 1)
+		e.ReceivePriority(nodes[2].Address, 1)
 		time.Sleep(2 * time.Second)
 		assert.NotNil(t, e.newLeader)
 		assert.Equal(t, e.newLeader, nodes[0])
@@ -87,9 +87,9 @@ func TestElection(t *testing.T) {
 
 	t.Run("Should wait until all nodes has voted to elect a new leader", func(t *testing.T) {
 		nodes := []*NodeInfo{
-			{ID: "123", Address: "locahost:50051", electionState: accepted},
-			{ID: "124", Address: "locahost:50052", electionState: accepted},
-			{ID: "125", Address: "locahost:50053", electionState: accepted},
+			{Address: "locahost:50051", electionState: accepted},
+			{Address: "locahost:50052", electionState: accepted},
+			{Address: "locahost:50053", electionState: accepted},
 		}
 		e := NewElection(nodes)
 		newLeaderElect := false
@@ -100,12 +100,12 @@ func TestElection(t *testing.T) {
 		assert.Nil(t, e.newLeader)
 		assert.False(t, newLeaderElect)
 		time.Sleep(1 * time.Second)
-		e.ReceiveVote(nodes[0].ID, nodes[1].ID)
-		e.ReceiveVote(nodes[1].ID, nodes[1].ID)
+		e.ReceiveVote(nodes[0].Address, nodes[1].Address)
+		e.ReceiveVote(nodes[1].Address, nodes[1].Address)
 		assert.False(t, newLeaderElect)
 		assert.Nil(t, e.newLeader)
 		time.Sleep(1 * time.Second)
-		e.ReceiveVote(nodes[2].ID, nodes[1].ID)
+		e.ReceiveVote(nodes[2].Address, nodes[1].Address)
 		time.Sleep(2 * time.Second)
 		assert.True(t, newLeaderElect)
 		assert.NotNil(t, e.newLeader)

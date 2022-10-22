@@ -40,12 +40,11 @@ func (c *Client) RequestRegister(ctx context.Context, leaderAddress string, key 
 
 	nodes := make([]*watcher.NodeInfo, len(r.Nodes))
 	for i, n := range r.Nodes {
-		nodes[i] = &watcher.NodeInfo{Address: n.Address, ID: n.Id}
+		nodes[i] = &watcher.NodeInfo{Address: n.Address}
 	}
 
 	return &watcher.RegisterResponse{
 		Success: r.Success,
-		Id:      r.Id,
 		Nodes:   nodes,
 	}, nil
 }
@@ -65,19 +64,13 @@ func (c *Client) AckNode(ctx context.Context, address, key string, node *watcher
 
 	client := pb.NewWatcherClient(conn)
 	res, err := client.AckNode(ctx, &pb.AckRequest{
-		Key: key,
-		Node: &pb.Node{
-			Id:      node.ID,
-			Address: node.Address,
-		},
+		Key:  key,
+		Node: &pb.Node{Address: node.Address},
 	})
 
 	if err != nil {
 		return nil, err
 	}
 
-	return &watcher.NodeInfo{
-		ID:      res.Id,
-		Address: res.Address,
-	}, err
+	return &watcher.NodeInfo{Address: res.Address}, err
 }

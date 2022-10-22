@@ -2,6 +2,7 @@ package watcher
 
 import (
 	"github.com/stretchr/testify/assert"
+	"sync"
 	"testing"
 	"time"
 )
@@ -118,6 +119,7 @@ func TestWatcher(t *testing.T) {
 	t.Run("Should register nodes", func(t *testing.T) {
 		w := &Watcher{
 			registrationKey: "key",
+			registerLocker:  &sync.Mutex{},
 		}
 		_, err := w.RegisterNode(&NodeInfo{Address: "http://localhost:8080"}, "key")
 		assert.NoError(t, err)
@@ -138,6 +140,7 @@ func TestWatcher(t *testing.T) {
 	t.Run("Should return all registered nodes, on new node registration", func(t *testing.T) {
 		w := &Watcher{
 			registrationKey: "key",
+			registerLocker:  &sync.Mutex{},
 		}
 		nodes, err := w.RegisterNode(&NodeInfo{Address: "http://localhost:8080"}, "key")
 		assert.NoError(t, err)
@@ -148,17 +151,5 @@ func TestWatcher(t *testing.T) {
 		nodes, err = w.RegisterNode(&NodeInfo{Address: "http://localhost:8082"}, "key")
 		assert.NoError(t, err)
 		assert.Equal(t, 3, len(nodes))
-	})
-
-	t.Run("An id should be set on node registration", func(t *testing.T) {
-		w := &Watcher{
-			registrationKey: "key",
-		}
-		info := &NodeInfo{Address: "http://localhost:8080"}
-
-		nodes, err := w.RegisterNode(info, "key")
-		assert.NoError(t, err)
-		assert.Equal(t, 1, len(nodes))
-		assert.NotEmpty(t, info.ID)
 	})
 }

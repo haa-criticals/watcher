@@ -4,7 +4,6 @@ import "context"
 
 type RegisterResponse struct {
 	Success bool
-	Id      string
 	Nodes   []*NodeInfo
 }
 

@@ -64,9 +64,9 @@ func (e *Election) WaitRegistration() {
 	}
 }
 
-func (e *Election) ReceivePriority(id string, priority int) {
+func (e *Election) ReceivePriority(address string, priority int) {
 	for _, n := range e.nodes {
-		if n.ID == id {
+		if n.Address == address {
 			n.electionState = registered
 			n.priority = priority
 		}
@@ -116,9 +116,9 @@ func (e *Election) checkNodesVoted() bool {
 	return true
 }
 
-func (e *Election) ReceiveVote(id string, vote string) {
+func (e *Election) ReceiveVote(address string, vote string) {
 	for _, n := range e.nodes {
-		if n.ID == id {
+		if n.Address == address {
 			n.electionVote = vote
 			n.electionState = voted
 		}
@@ -132,7 +132,7 @@ func (e *Election) getMostVoted() *NodeInfo {
 	}
 	var mostVoted *NodeInfo
 	for _, n := range e.nodes {
-		if mostVoted == nil || votes[n.ID] > votes[mostVoted.electionVote] {
+		if mostVoted == nil || votes[n.Address] > votes[mostVoted.electionVote] {
 			mostVoted = n
 		}
 	}

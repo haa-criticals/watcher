@@ -34,7 +34,6 @@ func TestRequestRegisterWatcherClient(t *testing.T) {
 				assert.Equal(t, "test", in.Key)
 				return &pb.RegisterResponse{
 					Success: true,
-					Id:      "123",
 				}, nil
 			},
 		}
@@ -55,7 +54,6 @@ func TestRequestRegisterWatcherClient(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, r)
 		assert.True(t, r.Success)
-		assert.Equal(t, "123", r.Id)
 		s.GracefulStop()
 	})
 
@@ -66,10 +64,9 @@ func TestRequestRegisterWatcherClient(t *testing.T) {
 				assert.Equal(t, "test", in.Key)
 				return &pb.RegisterResponse{
 					Success: true,
-					Id:      "123",
 					Nodes: []*pb.Node{
-						{Address: "localhost:50051", Id: "123"},
-						{Address: "localhost:50052", Id: "124"},
+						{Address: "localhost:50051"},
+						{Address: "localhost:50052"},
 					},
 				}, nil
 			},
@@ -91,12 +88,9 @@ func TestRequestRegisterWatcherClient(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, r)
 		assert.True(t, r.Success)
-		assert.Equal(t, "123", r.Id)
 		assert.Equal(t, 2, len(r.Nodes))
 		assert.Equal(t, "localhost:50051", r.Nodes[0].Address)
-		assert.Equal(t, "123", r.Nodes[0].ID)
 		assert.Equal(t, "localhost:50052", r.Nodes[1].Address)
-		assert.Equal(t, "124", r.Nodes[1].ID)
 		s.GracefulStop()
 	})
 
@@ -113,7 +107,7 @@ func TestAckWatcherClient(t *testing.T) {
 	t.Run("Should return error when acked node is not available", func(t *testing.T) {
 		c := NewWatchClient("localhost:50051")
 
-		r, err := c.AckNode(context.Background(), "localhost:50050", "test", &watcher.NodeInfo{Address: "localhost:50051", ID: "123"})
+		r, err := c.AckNode(context.Background(), "localhost:50050", "test", &watcher.NodeInfo{Address: "localhost:50051"})
 		assert.Error(t, err)
 		assert.Nil(t, r)
 	})
@@ -123,10 +117,8 @@ func TestAckWatcherClient(t *testing.T) {
 			fAckNode: func(ctx context.Context, in *pb.AckRequest) (*pb.Node, error) {
 				assert.Equal(t, "localhost:50051", in.Node.Address)
 				assert.Equal(t, "test", in.Key)
-				assert.Equal(t, "123", in.Node.Id)
 				return &pb.Node{
 					Address: "localhost:50050",
-					Id:      "124",
 				}, nil
 			},
 		}
@@ -143,11 +135,10 @@ func TestAckWatcherClient(t *testing.T) {
 		time.Sleep(10 * time.Millisecond) // wait to start server
 		c := NewWatchClient("localhost:50051")
 
-		r, err := c.AckNode(context.Background(), "localhost:50050", "test", &watcher.NodeInfo{Address: "localhost:50051", ID: "123"})
+		r, err := c.AckNode(context.Background(), "localhost:50050", "test", &watcher.NodeInfo{Address: "localhost:50051"})
 		assert.NoError(t, err)
 		assert.NotNil(t, r)
 		assert.Equal(t, "localhost:50050", r.Address)
-		assert.Equal(t, "124", r.ID)
 		s.GracefulStop()
 	})
 }

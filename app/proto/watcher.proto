@@ -14,12 +14,10 @@ message RegisterRequest {
 
 message Node {
     string address = 1;
-    string id = 2;
 }
 
 message RegisterResponse {
     bool success = 1;
-    string id = 2;
     repeated Node nodes = 3;
 }
 
