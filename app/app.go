@@ -98,6 +98,7 @@ func (a *App) Start() error {
 		if err != nil {
 			return err
 		}
+		a.monitor.StartHealthChecks()
 	}
 	return a.StartServer()
 }

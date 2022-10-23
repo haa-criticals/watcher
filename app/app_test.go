@@ -2,7 +2,11 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"github.com.haa-criticals/watcher/provisioner"
+	"log"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -115,5 +119,45 @@ func TestAppStart(t *testing.T) {
 		time.Sleep(2 * time.Second)
 		assert.True(t, createCalled)
 
+	})
+
+	t.Run("Should start health check when the app starts as leader", func(t *testing.T) {
+		config := &Config{
+			Port: 50051,
+		}
+
+		healthCalled := false
+		mux := http.NewServeMux()
+		mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			healthCalled = true
+		})
+
+		server := httptest.NewUnstartedServer(mux)
+		provider := &mockProvider{
+			fCreate: func(ctx context.Context) error {
+				server.Start()
+				log.Println("server started")
+				return nil
+			},
+		}
+
+		app := New(
+			watcher.New(igrpc.NewWatchClient("localhost:50051")),
+			monitor.New(monitor.WithHealthCheck(fmt.Sprintf("http://%s%s", server.Listener.Addr(), "/health"), 1*time.Second, 3)),
+			provisioner.WithProvider(provider),
+			config,
+		)
+		go func() {
+			err := app.Start()
+			if err != nil {
+				t.Errorf("failed to start server: %v", err)
+			}
+		}()
+
+		time.Sleep(2 * time.Second)
+		assert.True(t, healthCalled)
+		assert.True(t, app.monitor.IsHealthy())
+		server.Close()
 	})
 }

@@ -49,7 +49,7 @@ to quickly create a Cobra application.`,
 			monitor.WithHeartBeat(grpc.NewNotifier(), 5*time.Second),
 			monitor.WithHealthCheck("https://www.google.com", 5*time.Second, 3),
 		)
-		a := app.New(w, m, &app.Config{
+		a := app.New(w, m, nil, &app.Config{
 			Port:    port,
 			Leader:  leader,
 			Address: url,
