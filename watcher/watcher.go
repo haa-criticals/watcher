@@ -82,6 +82,7 @@ func (w *Watcher) StopHeartBeatChecking() {
 
 func (w *Watcher) OnReceiveHeartBeat(heartBeatTime time.Time) {
 	w.lastReceivedBeat = heartBeatTime
+	log.Printf("Received heart beat from %s", w.leader.Address)
 }
 
 func (w *Watcher) RegisterLeader(leader *NodeInfo) {
