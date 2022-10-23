@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com.haa-criticals/watcher/monitor"
+	"github.com.haa-criticals/watcher/provisioner"
 	"github.com.haa-criticals/watcher/watcher"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"log"
@@ -23,17 +24,21 @@ type Config struct {
 
 type App struct {
 	pb.UnimplementedWatcherServer
-	watcher *watcher.Watcher
-	monitor *monitor.Monitor
-	config  *Config
+	watcher     *watcher.Watcher
+	monitor     *monitor.Monitor
+	config      *Config
+	isLeader    bool
+	provisioner *provisioner.Manager
 }
 
-func New(watcher *watcher.Watcher, monitor *monitor.Monitor, config *Config) *App {
+func New(watcher *watcher.Watcher, monitor *monitor.Monitor, provisioner *provisioner.Manager, config *Config) *App {
 	watcher.Address = config.Address
 	return &App{
-		watcher: watcher,
-		monitor: monitor,
-		config:  config,
+		watcher:     watcher,
+		monitor:     monitor,
+		provisioner: provisioner,
+		config:      config,
+		isLeader:    config.Leader == "",
 	}
 }
 
@@ -80,8 +85,19 @@ func (a *App) Heartbeat(_ context.Context, in *pb.Beat) (*emptypb.Empty, error) 
 }
 
 func (a *App) Start() error {
-	if a.config.Leader != "" {
-		go a.requestRegister()
+	if !a.isLeader {
+		go func() {
+			err := a.requestRegister()
+			if err != nil {
+				log.Println("failed to register", err)
+			}
+		}()
+	} else {
+		log.Println("Starting watcher as leader")
+		err := a.provisioner.Create(context.Background())
+		if err != nil {
+			return err
+		}
 	}
 	return a.StartServer()
 }

@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"github.com.haa-criticals/watcher/provisioner"
 	"testing"
 	"time"
 
@@ -16,12 +17,25 @@ import (
 	"github.com.haa-criticals/watcher/watcher"
 )
 
+type mockProvider struct {
+	fCreate  func(ctx context.Context) error
+	fDestroy func(ctx context.Context) error
+}
+
+func (m *mockProvider) Create(ctx context.Context) error {
+	return m.fCreate(ctx)
+}
+
+func (m *mockProvider) Destroy(ctx context.Context) error {
+	return m.fDestroy(ctx)
+}
+
 func TestRegisterWatcher(t *testing.T) {
 	t.Run("should register watcher", func(t *testing.T) {
 		config := &Config{
 			Port: 50051,
 		}
-		server := New(watcher.New(igrpc.NewWatchClient("localhost:50051")), monitor.New(), config)
+		server := New(watcher.New(igrpc.NewWatchClient("localhost:50051")), monitor.New(), nil, config)
 		go func() {
 			err := server.Start()
 			if err != nil {
@@ -46,6 +60,7 @@ func TestRegisterWatcher(t *testing.T) {
 		leader := New(
 			watcher.New(igrpc.NewWatchClient("localhost:50051")),
 			monitor.New(monitor.WithHeartBeat(igrpc.NewNotifier(), 1*time.Second)),
+			nil,
 			config)
 		go func() {
 			err := leader.Start()
@@ -56,7 +71,7 @@ func TestRegisterWatcher(t *testing.T) {
 
 		ref := time.Now()
 		w := watcher.New(igrpc.NewWatchClient("localhost:50052"))
-		node := New(w, monitor.New(), &Config{Port: 50052, Leader: "localhost:50051", Address: "localhost:50052"})
+		node := New(w, monitor.New(), nil, &Config{Port: 50052, Leader: "localhost:50051", Address: "localhost:50052"})
 		go func() {
 			err := node.Start()
 			if err != nil {
@@ -67,5 +82,38 @@ func TestRegisterWatcher(t *testing.T) {
 		time.Sleep(3 * time.Second)
 		assert.True(t, w.LastReceivedBeat().After(ref))
 		w.StopHeartBeatChecking()
+	})
+}
+
+func TestAppStart(t *testing.T) {
+	t.Run("Should call the provisioner create when the app starts as leader", func(t *testing.T) {
+		config := &Config{
+			Port: 50051,
+		}
+
+		createCalled := false
+		provider := &mockProvider{
+			fCreate: func(ctx context.Context) error {
+				createCalled = true
+				return nil
+			},
+		}
+
+		server := New(
+			watcher.New(igrpc.NewWatchClient("localhost:50051")),
+			monitor.New(),
+			provisioner.WithProvider(provider),
+			config,
+		)
+		go func() {
+			err := server.Start()
+			if err != nil {
+				t.Errorf("failed to start server: %v", err)
+			}
+		}()
+
+		time.Sleep(2 * time.Second)
+		assert.True(t, createCalled)
+
 	})
 }
