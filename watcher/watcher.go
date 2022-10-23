@@ -148,3 +148,7 @@ func (w *Watcher) AckNode(info *NodeInfo, key string) error {
 	log.Printf("Registered nodes: %v", w.nodes)
 	return nil
 }
+
+func (w *Watcher) LastReceivedBeat() time.Time {
+	return w.lastReceivedBeat
+}

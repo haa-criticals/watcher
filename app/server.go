@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com.haa-criticals/watcher/monitor"
 	"github.com.haa-criticals/watcher/watcher"
+	"google.golang.org/protobuf/types/known/emptypb"
 	"log"
 	"net"
 
@@ -73,6 +74,11 @@ func (a *App) AckNode(_ context.Context, in *pb.AckRequest) (*pb.Node, error) {
 	}, nil
 }
 
+func (a *App) Heartbeat(_ context.Context, in *pb.Beat) (*emptypb.Empty, error) {
+	a.watcher.OnReceiveHeartBeat(in.Timestamp.AsTime())
+	return &emptypb.Empty{}, nil
+}
+
 func (a *App) Start() error {
 	if a.config.Leader != "" {
 		go a.requestRegister()
@@ -91,9 +97,6 @@ func (a *App) StartServer() error {
 	return s.Serve(listen)
 }
 
-func (a *App) requestRegister() {
-	err := a.watcher.RequestRegister(a.config.Leader, a.config.clusterKey)
-	if err != nil {
-		log.Println("Error registering node", err)
-	}
+func (a *App) requestRegister() error {
+	return a.watcher.RequestRegister(a.config.Leader, a.config.clusterKey)
 }
