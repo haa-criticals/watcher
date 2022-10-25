@@ -292,3 +292,11 @@ func (w *Watcher) processElection() {
 		}
 	}
 }
+
+func (w *Watcher) OnElectionRegistration(_ context.Context, node *NodeInfo, priority int32) error {
+	if w.election == nil {
+		return errors.New("there is no election")
+	}
+	w.election.ReceivePriority(node.Address, priority)
+	return nil
+}
