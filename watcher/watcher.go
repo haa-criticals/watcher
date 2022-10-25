@@ -3,6 +3,7 @@ package watcher
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -11,7 +12,7 @@ import (
 type NodeInfo struct {
 	Address       string
 	electionState electionState
-	priority      int
+	priority      int32
 	electionVote  string
 }
 
@@ -184,12 +185,37 @@ func (w *Watcher) OnNewElectionRequest(_ context.Context, request *ElectionReque
 
 	w.election = NewElection(w.nodes)
 	w.election.startedAt = request.StartedAt
+	w.election.state = requested
 
 	return &ElectionResponse{
 		Accepted: true,
 		Node:     node,
 	}, nil
 
+}
+
+func (w *Watcher) OnElectionStart(ctx context.Context, requester *NodeInfo, priority int32) error {
+	if w.election == nil {
+		return fmt.Errorf("received election start from %s, but there is no election", requester.Address)
+	}
+	if w.election.state != requested {
+		return fmt.Errorf("received election start from %s, but election is already started", requester.Address)
+	}
+	node := &NodeInfo{
+		Address: w.Address,
+	}
+	w.election.state = accepted
+	for _, n := range w.election.nodes {
+		if n.Address == requester.Address {
+			n.priority = priority
+		}
+		err := w.client.RequestElectionRegistration(ctx, node, n, w.priority)
+		if err != nil {
+			log.Println(err)
+		}
+	}
+	go w.sendVoteAfterRegistration()
+	return nil
 }
 
 func (w *Watcher) RegisterNode(n *NodeInfo, key string) ([]*NodeInfo, error) {
@@ -248,4 +274,14 @@ func (w *Watcher) AckNode(info *NodeInfo, key string) error {
 
 func (w *Watcher) LastReceivedBeat() time.Time {
 	return w.lastReceivedBeat
+}
+
+func (w *Watcher) sendVoteAfterRegistration() {
+	w.election.WaitRegistration()
+	for _, n := range w.election.nodes {
+		err := w.client.SendElectionVote(context.Background(), &NodeInfo{Address: w.Address}, w.election.newLeader, n)
+		if err != nil {
+			log.Printf("Failed to send election vote to %s: %s", n.Address, err)
+		}
+	}
 }

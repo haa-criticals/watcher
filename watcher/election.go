@@ -76,7 +76,7 @@ func (e *Election) WaitRegistration() {
 	}
 }
 
-func (e *Election) ReceivePriority(address string, priority int) {
+func (e *Election) ReceivePriority(address string, priority int32) {
 	for _, n := range e.nodes {
 		if n.Address == address {
 			n.electionState = registered
