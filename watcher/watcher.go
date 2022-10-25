@@ -10,10 +10,11 @@ import (
 )
 
 type NodeInfo struct {
-	Address       string
-	electionState electionState
-	priority      int32
-	electionVote  string
+	Address         string
+	electionState   electionState
+	priority        int32
+	electionVote    string
+	electionElected string
 }
 
 type Watcher struct {
@@ -291,6 +292,10 @@ func (w *Watcher) processElection() {
 			log.Printf("Failed to send election result to %s: %s", n.Address, err)
 		}
 	}
+
+	w.election.waitConfirmation()
+	l := w.election.newElectedLeader()
+	w.OnNewLeader(l)
 }
 
 func (w *Watcher) OnElectionRegistration(_ context.Context, node *NodeInfo, priority int32) error {
@@ -307,4 +312,26 @@ func (w *Watcher) OnReceiveElectionVote(_ context.Context, node *NodeInfo, elect
 	}
 	w.election.ReceiveVote(node.Address, elected.Address)
 	return nil
+}
+
+func (w *Watcher) OnElectionConclusion(_ context.Context, node *NodeInfo, elected *NodeInfo) error {
+	if w.election == nil {
+		return errors.New("there is no election")
+	}
+	w.election.ReceiveConclusion(node.Address, elected.Address)
+	return nil
+}
+
+func (w *Watcher) OnNewLeader(leader *NodeInfo) {
+	for i := range w.nodes {
+		if w.nodes[i].Address == leader.Address {
+			w.nodes[i] = w.leader
+			break
+		}
+	}
+	w.leader = leader
+	if w.leader.Address == w.Address {
+		w.StartHeartBeatChecking()
+	}
+
 }

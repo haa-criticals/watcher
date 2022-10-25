@@ -115,7 +115,10 @@ func (a *App) SendElectionVote(ctx context.Context, vote *pb.ElectionVote) (*emp
 		&watcher.NodeInfo{Address: vote.Elected.Address})
 	return &emptypb.Empty{}, err
 }
-func (a *App) SendElectionConclusion(context.Context, *pb.ElectedNode) (*emptypb.Empty, error) {
+func (a *App) SendElectionConclusion(ctx context.Context, e *pb.ElectedNode) (*emptypb.Empty, error) {
+	a.watcher.OnElectionConclusion(ctx,
+		&watcher.NodeInfo{Address: e.Node.Address},
+		&watcher.NodeInfo{Address: e.Elected.Address})
 	return nil, status.Errorf(codes.Unimplemented, "method SendElectionConclusion not implemented")
 }
 

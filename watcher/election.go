@@ -30,6 +30,7 @@ type Election struct {
 	OnNewLeaderElect func(nodes *NodeInfo)
 	newLeader        *NodeInfo
 	startedAt        time.Time
+	confirmed        int
 }
 
 func NewElection(nodes []*NodeInfo) *Election {
@@ -155,4 +156,44 @@ func (e *Election) getMostVoted() *NodeInfo {
 
 func (e *Election) Accepted(n *NodeInfo) {
 	n.electionState = accepted
+}
+
+func (e *Election) waitConfirmation() {
+	t := time.Tick(1 * time.Second)
+	for {
+		select {
+		case <-t:
+			if e.checkNodesConfirmed() {
+				e.state = finished
+				return
+			}
+		}
+	}
+}
+
+func (e *Election) ReceiveConclusion(node string, elected string) {
+	for _, n := range e.nodes {
+		if n.Address == node && n.electionState == voted {
+			n.electionState = finished
+			if elected == e.newLeader.Address {
+				e.confirmed++
+			}
+		}
+	}
+}
+
+func (e *Election) checkNodesConfirmed() bool {
+	for _, n := range e.nodes {
+		if n.electionState != finished {
+			return false
+		}
+	}
+	return true
+}
+
+func (e *Election) newElectedLeader() *NodeInfo {
+	if len(e.nodes) != e.confirmed {
+		return nil
+	}
+	return e.newLeader
 }
