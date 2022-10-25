@@ -111,7 +111,9 @@ func (e *Election) WaitVotes() {
 		case <-t:
 			if e.checkNodesVoted() {
 				e.newLeader = e.getMostVoted()
-				e.OnNewLeaderElect(e.newLeader)
+				if e.OnNewLeaderElect != nil {
+					e.OnNewLeaderElect(e.newLeader)
+				}
 				e.state = voted
 				return
 			}

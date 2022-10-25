@@ -214,7 +214,7 @@ func (w *Watcher) OnElectionStart(ctx context.Context, requester *NodeInfo, prio
 			log.Println(err)
 		}
 	}
-	go w.sendVoteAfterRegistration()
+	go w.processElection()
 	return nil
 }
 
@@ -276,12 +276,19 @@ func (w *Watcher) LastReceivedBeat() time.Time {
 	return w.lastReceivedBeat
 }
 
-func (w *Watcher) sendVoteAfterRegistration() {
+func (w *Watcher) processElection() {
 	w.election.WaitRegistration()
 	for _, n := range w.election.nodes {
 		err := w.client.SendElectionVote(context.Background(), &NodeInfo{Address: w.Address}, w.election.newLeader, n)
 		if err != nil {
 			log.Printf("Failed to send election vote to %s: %s", n.Address, err)
+		}
+	}
+	w.election.WaitVotes()
+	for _, n := range w.election.nodes {
+		err := w.client.SendElectionConclusion(context.Background(), &NodeInfo{Address: w.Address}, w.election.newLeader, n)
+		if err != nil {
+			log.Printf("Failed to send election result to %s: %s", n.Address, err)
 		}
 	}
 }
