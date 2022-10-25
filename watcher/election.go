@@ -13,7 +13,15 @@ const (
 	registered
 	voted
 	finished
+	failed
 )
+
+type ElectionRequest struct {
+	Requester *NodeInfo
+	Leader    *NodeInfo
+	LastBeat  time.Time
+	StartedAt time.Time
+}
 
 type Election struct {
 	nodes            []*NodeInfo
@@ -21,12 +29,14 @@ type Election struct {
 	OnStartElection  func(nodes []*NodeInfo)
 	OnNewLeaderElect func(nodes *NodeInfo)
 	newLeader        *NodeInfo
+	startedAt        time.Time
 }
 
 func NewElection(nodes []*NodeInfo) *Election {
 	return &Election{
-		nodes: nodes,
-		state: requested,
+		nodes:     nodes,
+		state:     requested,
+		startedAt: time.Now(),
 	}
 }
 
@@ -37,7 +47,9 @@ func (e *Election) Start() error {
 	if !e.CheckNodesAccepted() {
 		return errors.New("not all nodes accepted election yet")
 	}
-	e.OnStartElection(e.nodes)
+	if e.OnStartElection != nil {
+		e.OnStartElection(e.nodes)
+	}
 	return nil
 }
 
@@ -137,4 +149,8 @@ func (e *Election) getMostVoted() *NodeInfo {
 		}
 	}
 	return mostVoted
+}
+
+func (e *Election) Accepted(n *NodeInfo) {
+	n.electionState = accepted
 }

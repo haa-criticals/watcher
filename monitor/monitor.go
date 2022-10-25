@@ -106,6 +106,10 @@ func (m *Monitor) Stop() {
 	m.healthChecker.Stop()
 }
 
+func (m *Monitor) IsMonitoring() bool {
+	return m.isHeartBeating || m.healthChecker.active
+}
+
 func New(options ...Option) *Monitor {
 	m := &Monitor{
 		heartBeatInterval: 5 * time.Second,

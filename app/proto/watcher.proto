@@ -30,8 +30,40 @@ message AckRequest {
     Node node = 2;
 }
 
+message ElectionRequest {
+    Node Requester = 1;
+    Node leader = 2;
+    google.protobuf.Timestamp lastBeat = 3;
+    google.protobuf.Timestamp startedAt = 4;
+}
+
+message ElectionResponse {
+    Node node = 1;
+    bool accepted = 2;
+}
+
+message ElectionRegistration {
+    Node node = 1;
+    int32 priority = 2;
+}
+
+message ElectionVote {
+    Node node = 1;
+    Node elected = 2;
+}
+
+message ElectedNode {
+    Node node = 1;
+    Node elected = 2;
+}
+
 service Watcher {
     rpc Register(RegisterRequest) returns (RegisterResponse) {}
     rpc AckNode(AckRequest) returns (Node) {}
     rpc Heartbeat(Beat) returns (google.protobuf.Empty) {}
+    rpc RequestElection(ElectionRequest) returns (ElectionResponse) {}
+    rpc ElectionStart(ElectionRegistration) returns (google.protobuf.Empty) {}
+    rpc RequestElectionRegistration(ElectionRegistration) returns (google.protobuf.Empty) {}
+    rpc SendElectionVote(ElectionVote) returns (google.protobuf.Empty) {}
+    rpc SendElectionConclusion(ElectedNode) returns (google.protobuf.Empty) {}
 }

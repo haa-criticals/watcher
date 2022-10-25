@@ -25,12 +25,14 @@ type Watcher struct {
 	checkingHeartBeatLock             sync.Mutex
 	lastLeaderDownNotificationTime    time.Time
 	minLeaderDownNotificationInterval time.Duration
-	OnLeaderDown                      func(info *NodeInfo, lastReceivedBeat time.Time)
+	OnLeaderDown                      func(leader *NodeInfo, nodes []*NodeInfo, lastBeat time.Time)
 	nodes                             []*NodeInfo
 	registrationKey                   string
 	client                            Client
 	Address                           string
 	registerLocker                    sync.Locker
+	election                          *Election
+	priority                          int32
 }
 
 func New(client Client) *Watcher {
@@ -63,7 +65,7 @@ func (w *Watcher) StartHeartBeatChecking() {
 	for {
 		select {
 		case <-t.C:
-			if time.Now().Sub(w.lastReceivedBeat) > w.maxLeaderAliveInterval {
+			if !w.isLeaderAlive() {
 				w.onNoReceivedHeartBeat()
 			}
 		case <-w.doneHeartBeatChecking:
@@ -71,6 +73,10 @@ func (w *Watcher) StartHeartBeatChecking() {
 			return
 		}
 	}
+}
+
+func (w *Watcher) isLeaderAlive() bool {
+	return time.Now().Sub(w.lastReceivedBeat) < w.maxLeaderAliveInterval
 }
 
 func (w *Watcher) StopHeartBeatChecking() {
@@ -82,7 +88,7 @@ func (w *Watcher) StopHeartBeatChecking() {
 
 func (w *Watcher) OnReceiveHeartBeat(heartBeatTime time.Time) {
 	w.lastReceivedBeat = heartBeatTime
-	log.Printf("Received heart beat from %s", w.leader.Address)
+	log.Printf("Received heart beat from %v", w.leader)
 }
 
 func (w *Watcher) RegisterLeader(leader *NodeInfo) {
@@ -92,8 +98,98 @@ func (w *Watcher) RegisterLeader(leader *NodeInfo) {
 func (w *Watcher) onNoReceivedHeartBeat() {
 	if time.Now().Sub(w.lastLeaderDownNotificationTime) > w.minLeaderDownNotificationInterval {
 		w.lastLeaderDownNotificationTime = time.Now()
-		w.OnLeaderDown(w.leader, w.lastReceivedBeat)
+		if w.OnLeaderDown != nil {
+			w.OnLeaderDown(w.leader, w.nodes, w.lastReceivedBeat)
+		}
+		w.requestElection()
 	}
+}
+
+func (w *Watcher) requestElection() {
+	w.election = NewElection(w.nodes)
+	node := &NodeInfo{
+		Address: w.Address,
+	}
+	for _, n := range w.nodes {
+		res, err := w.requestElectionStart(node, n, w.lastReceivedBeat)
+		if err != nil || !res.Accepted {
+			w.election.state = failed
+			return
+		}
+		w.election.Accepted(n)
+	}
+
+	for _, n := range w.nodes {
+		err := w.client.ElectionStart(context.Background(), node, n, w.priority)
+		if err != nil {
+			w.election.state = failed
+			return
+		}
+	}
+
+	w.election.WaitRegistration()
+	w.election.WaitVotes()
+
+	for _, n := range w.nodes {
+		err := w.client.SendElectionConclusion(context.Background(), node, n, w.election.newLeader)
+		if err != nil {
+			w.election.state = failed
+			return
+		}
+	}
+}
+
+func (w *Watcher) requestElectionStart(node, to *NodeInfo, beat time.Time) (*ElectionResponse, error) {
+	log.Printf("Requesting election from %s", to.Address)
+	res, err := w.client.RequestElection(context.Background(), node, to, w.leader, beat)
+	if err != nil {
+		log.Printf("Failed to request election to %s: %s", to.Address, err)
+		return nil, err
+	}
+	return res, nil
+}
+
+func (w *Watcher) OnNewElectionRequest(_ context.Context, request *ElectionRequest) (*ElectionResponse, error) {
+	node := &NodeInfo{
+		Address: w.Address,
+	}
+	if w.leader == nil {
+		return &ElectionResponse{
+			Accepted: false,
+			Node:     node,
+		}, errors.New("there is no leader")
+	}
+	if w.leader.Address != request.Leader.Address {
+		log.Printf("Leader is not %s, can't handle election request", request.Leader.Address)
+		return &ElectionResponse{
+			Accepted: false,
+			Node:     node,
+		}, errors.New("leader is not " + request.Leader.Address)
+	}
+
+	if request.LastBeat.Before(w.lastReceivedBeat) && w.isLeaderAlive() {
+		log.Printf("Leader %s is alive, can't handle election request", request.Leader.Address)
+		return &ElectionResponse{
+			Accepted: false,
+			Node:     node,
+		}, errors.New("leader is alive")
+	}
+
+	if w.election != nil && w.election.startedAt.Before(request.StartedAt) {
+		return &ElectionResponse{
+			Accepted: false,
+			Node:     node,
+		}, errors.New("the Election has been already started")
+	}
+
+	w.election = NewElection(w.nodes)
+	w.election.startedAt = request.StartedAt
+
+	return &ElectionResponse{
+		Accepted: true,
+		Node:     node,
+	}, nil
+
 }
 
 func (w *Watcher) RegisterNode(n *NodeInfo, key string) ([]*NodeInfo, error) {

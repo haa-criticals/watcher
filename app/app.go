@@ -3,16 +3,17 @@ package app
 import (
 	"context"
 	"fmt"
-	"github.com.haa-criticals/watcher/monitor"
-	"github.com.haa-criticals/watcher/provisioner"
-	"github.com.haa-criticals/watcher/watcher"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"log"
 	"net"
 
-	"google.golang.org/grpc"
-
 	"github.com.haa-criticals/watcher/app/grpc/pb"
+	"github.com.haa-criticals/watcher/monitor"
+	"github.com.haa-criticals/watcher/provisioner"
+	"github.com.haa-criticals/watcher/watcher"
 )
 
 type Config struct {
@@ -29,12 +30,13 @@ type App struct {
 	config      *Config
 	isLeader    bool
 	provisioner *provisioner.Manager
+	server      *grpc.Server
 }
 
-func New(watcher *watcher.Watcher, monitor *monitor.Monitor, provisioner *provisioner.Manager, config *Config) *App {
-	watcher.Address = config.Address
+func New(w *watcher.Watcher, monitor *monitor.Monitor, provisioner *provisioner.Manager, config *Config) *App {
+	w.Address = config.Address
 	return &App{
-		watcher:     watcher,
+		watcher:     w,
 		monitor:     monitor,
 		provisioner: provisioner,
 		config:      config,
@@ -84,6 +86,35 @@ func (a *App) Heartbeat(_ context.Context, in *pb.Beat) (*emptypb.Empty, error) 
 	return &emptypb.Empty{}, nil
 }
 
+func (a *App) RequestElection(ctx context.Context, request *pb.ElectionRequest) (*pb.ElectionResponse, error) {
+	requester := &watcher.NodeInfo{Address: request.Requester.Address}
+	leader := &watcher.NodeInfo{Address: request.Leader.Address}
+
+	res, err := a.watcher.OnNewElectionRequest(ctx, &watcher.ElectionRequest{
+		Requester: requester,
+		Leader:    leader,
+		LastBeat:  request.LastBeat.AsTime(),
+		StartedAt: request.StartedAt.AsTime(),
+	})
+	return &pb.ElectionResponse{
+		Accepted: res.Accepted,
+	}, err
+}
+
+func (a *App) ElectionStart(ctx context.Context, r *pb.ElectionRegistration) (*emptypb.Empty, error) {
+	a.watcher.OnElectionStart(ctx, &watcher.NodeInfo{Address: r.Node.Address}, r.Priority)
+	return &emptypb.Empty{}, nil
+}
+func (a *App) RequestElectionRegistration(context.Context, *pb.ElectionRegistration) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RequestElectionRegistration not implemented")
+}
+func (a *App) SendElectionVote(context.Context, *pb.ElectionVote) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SendElectionVote not implemented")
+}
+func (a *App) SendElectionConclusion(context.Context, *pb.ElectedNode) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SendElectionConclusion not implemented")
+}
+
 func (a *App) Start() error {
 	if !a.isLeader {
 		go func() {
@@ -109,11 +140,17 @@ func (a *App) StartServer() error {
 	if err != nil {
 		return err
 	}
-	s := grpc.NewServer()
-	pb.RegisterWatcherServer(s, a)
-	return s.Serve(listen)
+	a.server = grpc.NewServer()
+	pb.RegisterWatcherServer(a.server, a)
+	return a.server.Serve(listen)
 }
 
 func (a *App) requestRegister() error {
 	return a.watcher.RequestRegister(a.config.Leader, a.config.clusterKey)
+}
+
+func (a *App) Stop() {
+	a.monitor.Stop()
+	a.watcher.StopHeartBeatChecking()
+	a.server.GracefulStop()
 }

@@ -161,3 +161,69 @@ func TestAppStart(t *testing.T) {
 		server.Close()
 	})
 }
+
+func TestApp(t *testing.T) {
+	t.Run("A new leader should be elected when the current leader is down", func(t *testing.T) {
+		config := &Config{
+			Port:    50051,
+			Address: "localhost:50051",
+		}
+
+		provider := &mockProvider{
+			fCreate: func(ctx context.Context) error {
+				return nil
+			},
+		}
+
+		leader := New(
+			watcher.New(igrpc.NewWatchClient("localhost:50051")),
+			monitor.New(monitor.WithHeartBeat(igrpc.NewNotifier(), 1*time.Second)),
+			provisioner.WithProvider(provider),
+			config,
+		)
+		go func() {
+			err := leader.Start()
+			if err != nil {
+				t.Errorf("failed to start server: %v", err)
+			}
+		}()
+
+		node1 := New(
+			watcher.New(igrpc.NewWatchClient("localhost:50052")),
+			monitor.New(),
+			provisioner.WithProvider(provider),
+			&Config{Port: 50052, Leader: "localhost:50051", Address: "localhost:50052"},
+		)
+
+		go func() {
+			err := node1.Start()
+			if err != nil {
+				t.Errorf("failed to start node: %v", err)
+			}
+		}()
+
+		node2 := New(
+			watcher.New(igrpc.NewWatchClient("localhost:50053")),
+			monitor.New(),
+			provisioner.WithProvider(provider),
+			&Config{Port: 50053, Leader: "localhost:50051", Address: "localhost:50053"},
+		)
+
+		go func() {
+			err := node2.Start()
+			if err != nil {
+				t.Errorf("failed to start node: %v", err)
+			}
+		}()
+
+		time.Sleep(2 * time.Second)
+		assert.True(t, leader.isLeader)
+		assert.False(t, node1.isLeader)
+		assert.False(t, node2.isLeader)
+		leader.Stop()
+		time.Sleep(3 * time.Second)
+		assert.True(t, node1.isLeader || node2.isLeader)
+		node1.Stop()
+		node2.Stop()
+	})
+}
