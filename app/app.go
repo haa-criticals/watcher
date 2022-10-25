@@ -109,8 +109,11 @@ func (a *App) RequestElectionRegistration(ctx context.Context, r *pb.ElectionReg
 	err := a.watcher.OnElectionRegistration(ctx, &watcher.NodeInfo{Address: r.Node.Address}, r.Priority)
 	return &emptypb.Empty{}, err
 }
-func (a *App) SendElectionVote(context.Context, *pb.ElectionVote) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SendElectionVote not implemented")
+func (a *App) SendElectionVote(ctx context.Context, vote *pb.ElectionVote) (*emptypb.Empty, error) {
+	err := a.watcher.OnReceiveElectionVote(ctx,
+		&watcher.NodeInfo{Address: vote.Node.Address},
+		&watcher.NodeInfo{Address: vote.Elected.Address})
+	return &emptypb.Empty{}, err
 }
 func (a *App) SendElectionConclusion(context.Context, *pb.ElectedNode) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SendElectionConclusion not implemented")

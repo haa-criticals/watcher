@@ -300,3 +300,11 @@ func (w *Watcher) OnElectionRegistration(_ context.Context, node *NodeInfo, prio
 	w.election.ReceivePriority(node.Address, priority)
 	return nil
 }
+
+func (w *Watcher) OnReceiveElectionVote(_ context.Context, node *NodeInfo, elected *NodeInfo) error {
+	if w.election == nil {
+		return errors.New("there is no election")
+	}
+	w.election.ReceiveVote(node.Address, elected.Address)
+	return nil
+}
