@@ -3,7 +3,6 @@ module github.com.haa-criticals/watcher
 go 1.19
 
 require (
-	github.com/google/uuid v1.1.2
 	github.com/spf13/cobra v1.5.0
 	github.com/spf13/viper v1.13.0
 	github.com/stretchr/testify v1.8.0

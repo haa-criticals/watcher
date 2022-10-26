@@ -45,7 +45,7 @@ func New(w *watcher.Watcher, monitor *monitor.Monitor, provisioner *provisioner.
 }
 
 func (a *App) Register(_ context.Context, in *pb.RegisterRequest) (*pb.RegisterResponse, error) {
-	log.Printf("Registering node  %s", in.Address)
+	log.Printf("Registering node %s", in.Address)
 	nodeInfo := &watcher.NodeInfo{Address: in.Address}
 	registeredNodes, err := a.watcher.RegisterNode(nodeInfo, in.Key)
 	if err != nil {
@@ -131,7 +131,7 @@ func (a *App) Start() error {
 			}
 		}()
 	} else {
-		log.Printf("Starting watcher as leader on port %d", a.config.Port)
+		log.Println("Starting watcher as leader on port")
 		err := a.provisioner.Create(context.Background())
 		if err != nil {
 			return err

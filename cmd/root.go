@@ -62,7 +62,7 @@ to quickly create a Cobra application.`,
 		)
 		m := monitor.New(
 			monitor.WithHeartBeat(grpc.NewNotifier(), 5*time.Second),
-			monitor.WithHealthCheck("https://www.google.com", 5*time.Second, 3),
+			monitor.WithHealthCheck("https://www.google.com", 5*time.Minute, 3),
 		)
 
 		a := app.New(w, m, provisioner.WithProvider(&providerConsole{}), &app.Config{

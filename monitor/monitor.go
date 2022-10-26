@@ -38,7 +38,7 @@ type Monitor struct {
 func (m *Monitor) RegisterWatcher(watcher *watcher.NodeInfo) {
 	m.watchers = append(m.watchers, watcher)
 	if !m.isHeartBeating {
-		m.StartHeartBeating()
+		go m.StartHeartBeating()
 	}
 }
 
