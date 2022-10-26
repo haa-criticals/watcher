@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"github.com.haa-criticals/watcher/app/grpc"
 	"github.com.haa-criticals/watcher/monitor"
+	"github.com.haa-criticals/watcher/provisioner"
 	"github.com.haa-criticals/watcher/watcher"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -18,7 +20,7 @@ var (
 	cfgFile string
 	port    int
 	leader  string
-	url     string
+	address string
 
 	watch      bool
 	provider   string
@@ -28,6 +30,19 @@ var (
 	projectRef string
 	variables  map[string]string
 )
+
+type providerConsole struct {
+}
+
+func (p *providerConsole) Create(ctx context.Context) error {
+	log.Println("Provider called Create")
+	return nil
+}
+
+func (p *providerConsole) Destroy(ctx context.Context) error {
+	log.Println("Provider called Destroy")
+	return nil
+}
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -43,16 +58,17 @@ to quickly create a Cobra application.`,
 	// has an action associated with it:
 	Run: func(cmd *cobra.Command, args []string) {
 		w := watcher.New(
-			grpc.NewWatchClient(url),
+			grpc.NewWatchClient(address),
 		)
 		m := monitor.New(
 			monitor.WithHeartBeat(grpc.NewNotifier(), 5*time.Second),
 			monitor.WithHealthCheck("https://www.google.com", 5*time.Second, 3),
 		)
-		a := app.New(w, m, nil, &app.Config{
+
+		a := app.New(w, m, provisioner.WithProvider(&providerConsole{}), &app.Config{
 			Port:    port,
 			Leader:  leader,
-			Address: url,
+			Address: address,
 		})
 		if err := a.Start(); err != nil {
 			log.Fatalf("Error starting server: %v", err)
@@ -80,8 +96,8 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&projectRef, "project-ref", "r", "main", "The project ref to use with the provisioner's provider")
 	rootCmd.PersistentFlags().StringToStringVarP(&variables, "variables", "v", nil, "The variables to use with the provisioner's provider")
 	rootCmd.Flags().IntVarP(&port, "port", "p", 8080, "The port to use to serve")
-	rootCmd.Flags().StringVarP(&leader, "leader", "l", "localhost:50051", "The endpoint to use to connect to the leader")
-	rootCmd.Flags().StringVarP(&url, "url", "u", "localhost:8080", "The url to use to connect to this watcher")
+	rootCmd.Flags().StringVarP(&leader, "leader", "l", "", "The endpoint to use to connect to the leader")
+	rootCmd.Flags().StringVarP(&address, "address", "a", "localhost:8080", "The url to use to connect to this watcher")
 	_ = rootCmd.MarkFlagRequired("base-url")
 	_ = rootCmd.MarkFlagRequired("token")
 	_ = rootCmd.MarkFlagRequired("project-id")

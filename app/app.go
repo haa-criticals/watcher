@@ -131,12 +131,12 @@ func (a *App) Start() error {
 			}
 		}()
 	} else {
-		log.Println("Starting watcher as leader")
+		log.Printf("Starting watcher as leader on port %d", a.config.Port)
 		err := a.provisioner.Create(context.Background())
 		if err != nil {
 			return err
 		}
-		a.monitor.StartHealthChecks()
+		go a.monitor.StartHealthChecks()
 	}
 	return a.StartServer()
 }
