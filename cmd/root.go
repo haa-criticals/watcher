@@ -17,10 +17,11 @@ import (
 )
 
 var (
-	cfgFile string
-	port    int
-	leader  string
-	address string
+	cfgFile  string
+	port     int
+	leader   string
+	address  string
+	priority int32
 
 	watch      bool
 	provider   string
@@ -34,12 +35,12 @@ var (
 type providerConsole struct {
 }
 
-func (p *providerConsole) Create(ctx context.Context) error {
+func (p *providerConsole) Create(_ context.Context) error {
 	log.Println("Provider called Create")
 	return nil
 }
 
-func (p *providerConsole) Destroy(ctx context.Context) error {
+func (p *providerConsole) Destroy(_ context.Context) error {
 	log.Println("Provider called Destroy")
 	return nil
 }
@@ -98,6 +99,7 @@ func init() {
 	rootCmd.Flags().IntVarP(&port, "port", "p", 8080, "The port to use to serve")
 	rootCmd.Flags().StringVarP(&leader, "leader", "l", "", "The endpoint to use to connect to the leader")
 	rootCmd.Flags().StringVarP(&address, "address", "a", "localhost:8080", "The url to use to connect to this watcher")
+	rootCmd.Flags().Int32VarP(&priority, "priority", "P", 0, "The priority to be elected as leader")
 	_ = rootCmd.MarkFlagRequired("base-url")
 	_ = rootCmd.MarkFlagRequired("token")
 	_ = rootCmd.MarkFlagRequired("project-id")

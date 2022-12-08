@@ -2,10 +2,9 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"log"
 	"net"
@@ -86,40 +85,8 @@ func (a *App) Heartbeat(_ context.Context, in *pb.Beat) (*emptypb.Empty, error) 
 	return &emptypb.Empty{}, nil
 }
 
-func (a *App) RequestElection(ctx context.Context, request *pb.ElectionRequest) (*pb.ElectionResponse, error) {
-	requester := &watcher.NodeInfo{Address: request.Requester.Address}
-	leader := &watcher.NodeInfo{Address: request.Leader.Address}
-
-	res, err := a.watcher.OnNewElectionRequest(ctx, &watcher.ElectionRequest{
-		Requester: requester,
-		Leader:    leader,
-		LastBeat:  request.LastBeat.AsTime(),
-		StartedAt: request.StartedAt.AsTime(),
-	})
-	return &pb.ElectionResponse{
-		Accepted: res.Accepted,
-	}, err
-}
-
-func (a *App) ElectionStart(ctx context.Context, r *pb.ElectionRegistration) (*emptypb.Empty, error) {
-	err := a.watcher.OnElectionStart(ctx, &watcher.NodeInfo{Address: r.Node.Address}, r.Priority)
-	return &emptypb.Empty{}, err
-}
-func (a *App) RequestElectionRegistration(ctx context.Context, r *pb.ElectionRegistration) (*emptypb.Empty, error) {
-	err := a.watcher.OnElectionRegistration(ctx, &watcher.NodeInfo{Address: r.Node.Address}, r.Priority)
-	return &emptypb.Empty{}, err
-}
-func (a *App) SendElectionVote(ctx context.Context, vote *pb.ElectionVote) (*emptypb.Empty, error) {
-	err := a.watcher.OnReceiveElectionVote(ctx,
-		&watcher.NodeInfo{Address: vote.Node.Address},
-		&watcher.NodeInfo{Address: vote.Elected.Address})
-	return &emptypb.Empty{}, err
-}
-func (a *App) SendElectionConclusion(ctx context.Context, e *pb.ElectedNode) (*emptypb.Empty, error) {
-	a.watcher.OnElectionConclusion(ctx,
-		&watcher.NodeInfo{Address: e.Node.Address},
-		&watcher.NodeInfo{Address: e.Elected.Address})
-	return nil, status.Errorf(codes.Unimplemented, "method SendElectionConclusion not implemented")
+func (a *App) RequestVote(ctx context.Context, request *pb.ElectionRequest) (*pb.ElectionResponse, error) {
+	return nil, errors.New("not implemented")
 }
 
 func (a *App) Start() error {

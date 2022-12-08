@@ -11,31 +11,6 @@ import (
 type mockWatcherClient struct {
 	fRequestRegister func(ctx context.Context, address, key string) (*RegisterResponse, error)
 	fAckNode         func(ctx context.Context, address, key string, node *NodeInfo) (*NodeInfo, error)
-	fRequestElection func(ctx context.Context, address, to, leader *NodeInfo, beat time.Time) (*ElectionResponse, error)
-}
-
-func (m *mockWatcherClient) ElectionStart(ctx context.Context, node, to *NodeInfo, priority int32) error {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (m *mockWatcherClient) RequestElectionRegistration(ctx context.Context, node, to *NodeInfo, priority int32) error {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (m *mockWatcherClient) SendElectionVote(ctx context.Context, node, elected, to *NodeInfo) error {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (m *mockWatcherClient) SendElectionConclusion(ctx context.Context, node, elected, to *NodeInfo) error {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (m *mockWatcherClient) RequestElection(ctx context.Context, node, to, leader *NodeInfo, beat time.Time) (*ElectionResponse, error) {
-	return m.fRequestElection(ctx, node, to, leader, beat)
 }
 
 func (m *mockWatcherClient) RequestRegister(ctx context.Context, address, key string) (*RegisterResponse, error) {
@@ -52,7 +27,7 @@ func TestWatcher(t *testing.T) {
 		w := &Watcher{
 			lastReceivedBeat:       time.Now(),
 			leader:                 &NodeInfo{},
-			checkHeartBeatInterval: time.Second,
+			checkHeartBeatInterval: 1 * time.Second,
 			maxLeaderAliveInterval: 2 * time.Second,
 			OnLeaderDown: func(leader *NodeInfo, nodes []*NodeInfo, lastReceivedBeat time.Time) {
 				leaderDownTriggered = true
@@ -153,6 +128,39 @@ func TestWatcher(t *testing.T) {
 		go w.StartHeartBeatChecking()
 		time.Sleep(4 * time.Second)
 		assert.Equal(t, 1, leaderDownTriggeredCount)
+	})
+
+	t.Run("Should create an election if leader is down", func(t *testing.T) {
+		w := &Watcher{
+			lastReceivedBeat:                  time.Now(),
+			leader:                            &NodeInfo{},
+			checkHeartBeatInterval:            1 * time.Second,
+			maxLeaderAliveInterval:            2 * time.Second,
+			minLeaderDownNotificationInterval: 3 * time.Second,
+		}
+
+		go w.StartHeartBeatChecking()
+		time.Sleep(4 * time.Second)
+		assert.NotNil(t, w.election)
+	})
+
+	t.Run("Should start an election if leader is down", func(t *testing.T) {
+		w := &Watcher{
+			lastReceivedBeat:                  time.Now(),
+			leader:                            &NodeInfo{},
+			checkHeartBeatInterval:            1 * time.Second,
+			maxLeaderAliveInterval:            2 * time.Second,
+			minLeaderDownNotificationInterval: 3 * time.Second,
+			nodes: []*NodeInfo{
+				{"192.168.0.10", 1},
+				{"191.168.0.11", 2},
+			},
+		}
+
+		go w.StartHeartBeatChecking()
+		time.Sleep(4 * time.Second)
+		assert.NotNil(t, w.election)
+		assert.False(t, w.election.startedAt.IsZero())
 	})
 
 	t.Run("Should register nodes", func(t *testing.T) {

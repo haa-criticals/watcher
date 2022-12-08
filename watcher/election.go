@@ -2,18 +2,8 @@ package watcher
 
 import (
 	"errors"
+	"log"
 	"time"
-)
-
-type electionState int
-
-const (
-	requested electionState = iota
-	accepted
-	registered
-	voted
-	finished
-	failed
 )
 
 type ElectionRequest struct {
@@ -23,177 +13,22 @@ type ElectionRequest struct {
 	StartedAt time.Time
 }
 
-type Election struct {
-	nodes            []*NodeInfo
-	state            electionState
-	OnStartElection  func(nodes []*NodeInfo)
-	OnNewLeaderElect func(nodes *NodeInfo)
-	newLeader        *NodeInfo
-	startedAt        time.Time
-	confirmed        int
+type election struct {
+	nodes     []*NodeInfo
+	startedAt time.Time
 }
 
-func NewElection(nodes []*NodeInfo) *Election {
-	return &Election{
-		nodes:     nodes,
-		state:     requested,
-		startedAt: time.Now(),
+func newElection(nodes []*NodeInfo) *election {
+	log.Printf("Starting election with %d nodes", len(nodes))
+	return &election{
+		nodes: nodes,
 	}
 }
 
-func (e *Election) Start() error {
+func (e *election) start() error {
 	if len(e.nodes) == 0 {
 		return errors.New("no nodes to start election")
 	}
-	if !e.CheckNodesAccepted() {
-		return errors.New("not all nodes accepted election yet")
-	}
-	if e.OnStartElection != nil {
-		e.OnStartElection(e.nodes)
-	}
+	e.startedAt = time.Now()
 	return nil
-}
-
-func (e *Election) CheckNodesAccepted() bool {
-	for _, n := range e.nodes {
-		if n.electionState != accepted {
-			return false
-		}
-	}
-	return true
-}
-
-func (e *Election) WaitRegistration() {
-	t := time.Tick(1 * time.Second)
-	for {
-		select {
-		case <-t:
-			if e.checkNodesRegistered() {
-				e.newLeader = e.getHighestPriority()
-				e.state = registered
-				return
-			}
-		}
-	}
-}
-
-func (e *Election) ReceivePriority(address string, priority int32) {
-	for _, n := range e.nodes {
-		if n.Address == address {
-			n.electionState = registered
-			n.priority = priority
-		}
-	}
-}
-
-func (e *Election) checkNodesRegistered() bool {
-	for _, n := range e.nodes {
-		if n.electionState != registered {
-			return false
-		}
-	}
-	return true
-}
-
-func (e *Election) getHighestPriority() *NodeInfo {
-	var highest *NodeInfo
-	for _, n := range e.nodes {
-		if highest == nil || n.priority > highest.priority {
-			highest = n
-		}
-	}
-	return highest
-}
-
-func (e *Election) WaitVotes() {
-	t := time.Tick(1 * time.Second)
-	for {
-		select {
-		case <-t:
-			if e.checkNodesVoted() {
-				e.newLeader = e.getMostVoted()
-				if e.OnNewLeaderElect != nil {
-					e.OnNewLeaderElect(e.newLeader)
-				}
-				e.state = voted
-				return
-			}
-		}
-	}
-}
-
-func (e *Election) checkNodesVoted() bool {
-	for _, n := range e.nodes {
-		if n.electionState != voted {
-			return false
-		}
-	}
-	return true
-}
-
-func (e *Election) ReceiveVote(address string, vote string) {
-	for _, n := range e.nodes {
-		if n.Address == address {
-			n.electionVote = vote
-			n.electionState = voted
-		}
-	}
-}
-
-func (e *Election) getMostVoted() *NodeInfo {
-	votes := make(map[string]int)
-	for _, n := range e.nodes {
-		votes[n.electionVote]++
-	}
-	var mostVoted *NodeInfo
-	for _, n := range e.nodes {
-		if mostVoted == nil || votes[n.Address] > votes[mostVoted.electionVote] {
-			mostVoted = n
-		}
-	}
-	return mostVoted
-}
-
-func (e *Election) Accepted(n *NodeInfo) {
-	n.electionState = accepted
-}
-
-func (e *Election) waitConfirmation() {
-	t := time.Tick(1 * time.Second)
-	for {
-		select {
-		case <-t:
-			if e.checkNodesConfirmed() {
-				e.state = finished
-				return
-			}
-		}
-	}
-}
-
-func (e *Election) ReceiveConclusion(node string, elected string) {
-	for _, n := range e.nodes {
-		if n.Address == node && n.electionState == voted {
-			n.electionState = finished
-			if elected == e.newLeader.Address {
-				e.confirmed++
-			}
-		}
-	}
-}
-
-func (e *Election) checkNodesConfirmed() bool {
-	for _, n := range e.nodes {
-		if n.electionState != finished {
-			return false
-		}
-	}
-	return true
-}
-
-func (e *Election) newElectedLeader() *NodeInfo {
-	if len(e.nodes) != e.confirmed {
-		return nil
-	}
-	return e.newLeader
 }

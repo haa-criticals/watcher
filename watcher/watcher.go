@@ -3,18 +3,14 @@ package watcher
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
 	"sync"
 	"time"
 )
 
 type NodeInfo struct {
-	Address         string
-	electionState   electionState
-	priority        int32
-	electionVote    string
-	electionElected string
+	Address  string
+	priority int32
 }
 
 type Watcher struct {
@@ -33,7 +29,7 @@ type Watcher struct {
 	client                            Client
 	Address                           string
 	registerLocker                    sync.Locker
-	election                          *Election
+	election                          *election
 	priority                          int32
 }
 
@@ -41,8 +37,8 @@ func New(client Client) *Watcher {
 	return &Watcher{
 		client:                            client,
 		checkHeartBeatInterval:            1 * time.Second,
-		maxLeaderAliveInterval:            5 * time.Second,
-		minLeaderDownNotificationInterval: 5 * time.Second,
+		maxLeaderAliveInterval:            15 * time.Second,
+		minLeaderDownNotificationInterval: 20 * time.Second,
 		doneHeartBeatChecking:             make(chan struct{}),
 		registerLocker:                    &sync.Mutex{},
 	}
@@ -90,6 +86,9 @@ func (w *Watcher) StopHeartBeatChecking() {
 
 func (w *Watcher) OnReceiveHeartBeat(heartBeatTime time.Time) {
 	w.lastReceivedBeat = heartBeatTime
+	if !w.checkingHeartBeat {
+		go w.StartHeartBeatChecking()
+	}
 	log.Printf("Received heart beat from %v", w.leader)
 }
 
@@ -103,120 +102,16 @@ func (w *Watcher) onNoReceivedHeartBeat() {
 		if w.OnLeaderDown != nil {
 			w.OnLeaderDown(w.leader, w.nodes, w.lastReceivedBeat)
 		}
-		w.requestElection()
+		go w.startElection()
 	}
 }
 
-func (w *Watcher) requestElection() {
-	w.election = NewElection(w.nodes)
-	node := &NodeInfo{
-		Address: w.Address,
-	}
-	for _, n := range w.nodes {
-		res, err := w.requestElectionStart(node, n, w.lastReceivedBeat)
-		if err != nil || !res.Accepted {
-			w.election.state = failed
-			return
-		}
-		w.election.Accepted(n)
-	}
-
-	for _, n := range w.nodes {
-		err := w.client.ElectionStart(context.Background(), node, n, w.priority)
-		if err != nil {
-			w.election.state = failed
-			return
-		}
-	}
-
-	w.election.WaitRegistration()
-	w.election.WaitVotes()
-
-	for _, n := range w.nodes {
-		err := w.client.SendElectionConclusion(context.Background(), node, n, w.election.newLeader)
-		if err != nil {
-			w.election.state = failed
-			return
-		}
-	}
-}
-
-func (w *Watcher) requestElectionStart(node, to *NodeInfo, beat time.Time) (*ElectionResponse, error) {
-	log.Printf("Requesting election from %s", to.Address)
-	res, err := w.client.RequestElection(context.Background(), node, to, w.leader, beat)
+func (w *Watcher) startElection() {
+	w.election = newElection(w.nodes)
+	err := w.election.start()
 	if err != nil {
-		log.Printf("Failed to request election to %s: %s", to.Address, err)
-		return nil, err
+		log.Printf("Failed to start election: %s", err)
 	}
-	return res, nil
-}
-
-func (w *Watcher) OnNewElectionRequest(_ context.Context, request *ElectionRequest) (*ElectionResponse, error) {
-	node := &NodeInfo{
-		Address: w.Address,
-	}
-	if w.leader == nil {
-		return &ElectionResponse{
-			Accepted: false,
-			Node:     node,
-		}, errors.New("there is no leader")
-	}
-	if w.leader.Address != request.Leader.Address {
-		log.Printf("Leader is not %s, can't handle election request", request.Leader.Address)
-		return &ElectionResponse{
-			Accepted: false,
-			Node:     node,
-		}, errors.New("leader is not " + request.Leader.Address)
-	}
-
-	if request.LastBeat.Before(w.lastReceivedBeat) && w.isLeaderAlive() {
-		log.Printf("Leader %s is alive, can't handle election request", request.Leader.Address)
-		return &ElectionResponse{
-			Accepted: false,
-			Node:     node,
-		}, errors.New("leader is alive")
-	}
-
-	if w.election != nil && w.election.startedAt.Before(request.StartedAt) {
-		return &ElectionResponse{
-			Accepted: false,
-			Node:     node,
-		}, errors.New("the Election has been already started")
-	}
-
-	w.election = NewElection(w.nodes)
-	w.election.startedAt = request.StartedAt
-	w.election.state = requested
-
-	return &ElectionResponse{
-		Accepted: true,
-		Node:     node,
-	}, nil
-
-}
-
-func (w *Watcher) OnElectionStart(ctx context.Context, requester *NodeInfo, priority int32) error {
-	if w.election == nil {
-		return fmt.Errorf("received election start from %s, but there is no election", requester.Address)
-	}
-	if w.election.state != requested {
-		return fmt.Errorf("received election start from %s, but election is already started", requester.Address)
-	}
-	node := &NodeInfo{
-		Address: w.Address,
-	}
-	w.election.state = accepted
-	for _, n := range w.election.nodes {
-		if n.Address == requester.Address {
-			n.priority = priority
-		}
-		err := w.client.RequestElectionRegistration(ctx, node, n, w.priority)
-		if err != nil {
-			log.Println(err)
-		}
-	}
-	go w.processElection()
-	return nil
 }
 
 func (w *Watcher) RegisterNode(n *NodeInfo, key string) ([]*NodeInfo, error) {
@@ -277,51 +172,6 @@ func (w *Watcher) LastReceivedBeat() time.Time {
 	return w.lastReceivedBeat
 }
 
-func (w *Watcher) processElection() {
-	w.election.WaitRegistration()
-	for _, n := range w.election.nodes {
-		err := w.client.SendElectionVote(context.Background(), &NodeInfo{Address: w.Address}, w.election.newLeader, n)
-		if err != nil {
-			log.Printf("Failed to send election vote to %s: %s", n.Address, err)
-		}
-	}
-	w.election.WaitVotes()
-	for _, n := range w.election.nodes {
-		err := w.client.SendElectionConclusion(context.Background(), &NodeInfo{Address: w.Address}, w.election.newLeader, n)
-		if err != nil {
-			log.Printf("Failed to send election result to %s: %s", n.Address, err)
-		}
-	}
-
-	w.election.waitConfirmation()
-	l := w.election.newElectedLeader()
-	w.OnNewLeader(l)
-}
-
-func (w *Watcher) OnElectionRegistration(_ context.Context, node *NodeInfo, priority int32) error {
-	if w.election == nil {
-		return errors.New("there is no election")
-	}
-	w.election.ReceivePriority(node.Address, priority)
-	return nil
-}
-
-func (w *Watcher) OnReceiveElectionVote(_ context.Context, node *NodeInfo, elected *NodeInfo) error {
-	if w.election == nil {
-		return errors.New("there is no election")
-	}
-	w.election.ReceiveVote(node.Address, elected.Address)
-	return nil
-}
-
-func (w *Watcher) OnElectionConclusion(_ context.Context, node *NodeInfo, elected *NodeInfo) error {
-	if w.election == nil {
-		return errors.New("there is no election")
-	}
-	w.election.ReceiveConclusion(node.Address, elected.Address)
-	return nil
-}
-
 func (w *Watcher) OnNewLeader(leader *NodeInfo) {
 	for i := range w.nodes {
 		if w.nodes[i].Address == leader.Address {
@@ -333,5 +183,4 @@ func (w *Watcher) OnNewLeader(leader *NodeInfo) {
 	if w.leader.Address == w.Address {
 		w.StartHeartBeatChecking()
 	}
-
 }

@@ -18,11 +18,13 @@ message Node {
 
 message RegisterResponse {
     bool success = 1;
-    repeated Node nodes = 3;
+    repeated Node nodes = 2;
 }
 
 message Beat {
-    google.protobuf.Timestamp timestamp = 3;
+    google.protobuf.Timestamp timestamp = 1;
+    string address = 2;
+    int64 term = 3;
 }
 
 message AckRequest {
@@ -32,38 +34,21 @@ message AckRequest {
 
 message ElectionRequest {
     Node Requester = 1;
-    Node leader = 2;
-    google.protobuf.Timestamp lastBeat = 3;
-    google.protobuf.Timestamp startedAt = 4;
+    int64 term = 2;
+    int32 priority = 3;
+    google.protobuf.Timestamp lastBeat = 4;
+    google.protobuf.Timestamp startedAt = 5;
 }
 
 message ElectionResponse {
     Node node = 1;
-    bool accepted = 2;
-}
-
-message ElectionRegistration {
-    Node node = 1;
-    int32 priority = 2;
-}
-
-message ElectionVote {
-    Node node = 1;
-    Node elected = 2;
-}
-
-message ElectedNode {
-    Node node = 1;
-    Node elected = 2;
+    int64 term = 2;
+    bool voteGranted = 3;
 }
 
 service Watcher {
     rpc Register(RegisterRequest) returns (RegisterResponse) {}
     rpc AckNode(AckRequest) returns (Node) {}
     rpc Heartbeat(Beat) returns (google.protobuf.Empty) {}
-    rpc RequestElection(ElectionRequest) returns (ElectionResponse) {}
-    rpc ElectionStart(ElectionRegistration) returns (google.protobuf.Empty) {}
-    rpc RequestElectionRegistration(ElectionRegistration) returns (google.protobuf.Empty) {}
-    rpc SendElectionVote(ElectionVote) returns (google.protobuf.Empty) {}
-    rpc SendElectionConclusion(ElectedNode) returns (google.protobuf.Empty) {}
+    rpc RequestVote(ElectionRequest) returns (ElectionResponse) {}
 }
