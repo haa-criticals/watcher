@@ -34,19 +34,19 @@ func TestHealthCheck(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	t.Run("Should send at least 5 health checks in 6 secs", func(t *testing.T) {
+	t.Run("Should send at least 5 health checks in 6 millisecs", func(t *testing.T) {
 		endpoint1 := &mockEndpoint{}
 		endpoint1.start()
 
 		c := &healthChecker{
 			endpoint: fmt.Sprintf("%s/healthz", endpoint1.baseURL()),
-			interval: time.Second,
+			interval: 1 * time.Millisecond,
 			maxFails: 3,
 			done:     make(chan struct{}),
 		}
 
 		go c.Start()
-		time.Sleep(6 * time.Second)
+		time.Sleep(6 * time.Millisecond)
 		c.Stop()
 		assert.GreaterOrEqual(t, endpoint1.healthCheckCount, 5)
 

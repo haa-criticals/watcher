@@ -27,15 +27,15 @@ func TestWatcher(t *testing.T) {
 		w := &Watcher{
 			lastReceivedBeat:       time.Now(),
 			leader:                 &NodeInfo{},
-			checkHeartBeatInterval: 1 * time.Second,
-			maxLeaderAliveInterval: 2 * time.Second,
+			checkHeartBeatInterval: 5 * time.Millisecond,
+			maxLeaderAliveInterval: 10 * time.Millisecond,
 			OnLeaderDown: func(leader *NodeInfo, nodes []*NodeInfo, lastReceivedBeat time.Time) {
 				leaderDownTriggered = true
 			},
 		}
 
 		go w.StartHeartBeatChecking()
-		time.Sleep(3 * time.Second)
+		time.Sleep(15 * time.Millisecond)
 		assert.True(t, leaderDownTriggered)
 	})
 
@@ -43,17 +43,17 @@ func TestWatcher(t *testing.T) {
 		leaderDownTriggered := false
 		w := &Watcher{
 			lastReceivedBeat:       time.Now(),
-			checkHeartBeatInterval: time.Second,
-			maxLeaderAliveInterval: 2 * time.Second,
+			checkHeartBeatInterval: 5 * time.Millisecond,
+			maxLeaderAliveInterval: 10 * time.Millisecond,
 			OnLeaderDown: func(leader *NodeInfo, nodes []*NodeInfo, lastReceivedBeat time.Time) {
 				leaderDownTriggered = true
 			},
 		}
 
 		go w.StartHeartBeatChecking()
-		time.Sleep(1 * time.Second)
+		time.Sleep(5 * time.Millisecond)
 		w.OnReceiveHeartBeat(time.Now())
-		time.Sleep(1 * time.Second)
+		time.Sleep(5 * time.Millisecond)
 		w.OnReceiveHeartBeat(time.Now())
 		assert.False(t, leaderDownTriggered)
 	})
@@ -63,8 +63,8 @@ func TestWatcher(t *testing.T) {
 		w := &Watcher{
 			lastReceivedBeat:       time.Now(),
 			leader:                 &NodeInfo{},
-			checkHeartBeatInterval: 2 * time.Second,
-			maxLeaderAliveInterval: 2 * time.Second,
+			checkHeartBeatInterval: 10 * time.Millisecond,
+			maxLeaderAliveInterval: 10 * time.Millisecond,
 			OnLeaderDown: func(leader *NodeInfo, nodes []*NodeInfo, lastReceivedBeat time.Time) {
 				leaderDownTriggeredCount = leaderDownTriggeredCount + 1
 			},
@@ -72,7 +72,7 @@ func TestWatcher(t *testing.T) {
 
 		go w.StartHeartBeatChecking()
 		go w.StartHeartBeatChecking()
-		time.Sleep(3 * time.Second)
+		time.Sleep(15 * time.Millisecond)
 		assert.Equal(t, 1, leaderDownTriggeredCount)
 	})
 
@@ -80,15 +80,15 @@ func TestWatcher(t *testing.T) {
 		leaderDownTriggeredCount := 0
 		w := &Watcher{
 			lastReceivedBeat:       time.Now(),
-			checkHeartBeatInterval: time.Second,
-			maxLeaderAliveInterval: 2 * time.Second,
+			checkHeartBeatInterval: 5 * time.Millisecond,
+			maxLeaderAliveInterval: 10 * time.Millisecond,
 			OnLeaderDown: func(leader *NodeInfo, nodes []*NodeInfo, lastReceivedBeat time.Time) {
 				leaderDownTriggeredCount = leaderDownTriggeredCount + 1
 			},
 		}
 
 		go w.StartHeartBeatChecking()
-		time.Sleep(3 * time.Second)
+		time.Sleep(15 * time.Millisecond)
 		assert.Equal(t, 0, leaderDownTriggeredCount)
 	})
 
@@ -97,8 +97,8 @@ func TestWatcher(t *testing.T) {
 		w := &Watcher{
 			lastReceivedBeat:       time.Now(),
 			leader:                 &NodeInfo{},
-			checkHeartBeatInterval: 2 * time.Second,
-			maxLeaderAliveInterval: 2 * time.Second,
+			checkHeartBeatInterval: 10 * time.Millisecond,
+			maxLeaderAliveInterval: 10 * time.Millisecond,
 			doneHeartBeatChecking:  make(chan struct{}),
 			OnLeaderDown: func(leader *NodeInfo, nodes []*NodeInfo, lastReceivedBeat time.Time) {
 				leaderDownTriggered = true
@@ -106,9 +106,9 @@ func TestWatcher(t *testing.T) {
 		}
 
 		go w.StartHeartBeatChecking()
-		time.Sleep(time.Second)
+		time.Sleep(5 * time.Millisecond)
 		w.StopHeartBeatChecking()
-		time.Sleep(2 * time.Second)
+		time.Sleep(10 * time.Millisecond)
 		assert.False(t, leaderDownTriggered)
 	})
 
@@ -117,16 +117,16 @@ func TestWatcher(t *testing.T) {
 		w := &Watcher{
 			lastReceivedBeat:                  time.Now(),
 			leader:                            &NodeInfo{},
-			checkHeartBeatInterval:            1 * time.Second,
-			maxLeaderAliveInterval:            2 * time.Second,
-			minLeaderDownNotificationInterval: 3 * time.Second,
+			checkHeartBeatInterval:            5 * time.Millisecond,
+			maxLeaderAliveInterval:            10 * time.Millisecond,
+			minLeaderDownNotificationInterval: 15 * time.Millisecond,
 			OnLeaderDown: func(leader *NodeInfo, nodes []*NodeInfo, lastReceivedBeat time.Time) {
 				leaderDownTriggeredCount++
 			},
 		}
 
 		go w.StartHeartBeatChecking()
-		time.Sleep(4 * time.Second)
+		time.Sleep(20 * time.Millisecond)
 		assert.Equal(t, 1, leaderDownTriggeredCount)
 	})
 
@@ -134,13 +134,13 @@ func TestWatcher(t *testing.T) {
 		w := &Watcher{
 			lastReceivedBeat:                  time.Now(),
 			leader:                            &NodeInfo{},
-			checkHeartBeatInterval:            1 * time.Second,
-			maxLeaderAliveInterval:            2 * time.Second,
-			minLeaderDownNotificationInterval: 3 * time.Second,
+			checkHeartBeatInterval:            5 * time.Millisecond,
+			maxLeaderAliveInterval:            10 * time.Millisecond,
+			minLeaderDownNotificationInterval: 15 * time.Millisecond,
 		}
 
 		go w.StartHeartBeatChecking()
-		time.Sleep(4 * time.Second)
+		time.Sleep(20 * time.Millisecond)
 		assert.NotNil(t, w.election)
 	})
 
@@ -148,9 +148,9 @@ func TestWatcher(t *testing.T) {
 		w := &Watcher{
 			lastReceivedBeat:                  time.Now(),
 			leader:                            &NodeInfo{},
-			checkHeartBeatInterval:            1 * time.Second,
-			maxLeaderAliveInterval:            2 * time.Second,
-			minLeaderDownNotificationInterval: 3 * time.Second,
+			checkHeartBeatInterval:            5 * time.Millisecond,
+			maxLeaderAliveInterval:            10 * time.Millisecond,
+			minLeaderDownNotificationInterval: 15 * time.Millisecond,
 			nodes: []*NodeInfo{
 				{"192.168.0.10", 1},
 				{"191.168.0.11", 2},
@@ -158,7 +158,7 @@ func TestWatcher(t *testing.T) {
 		}
 
 		go w.StartHeartBeatChecking()
-		time.Sleep(4 * time.Second)
+		time.Sleep(20 * time.Millisecond)
 		assert.NotNil(t, w.election)
 		assert.False(t, w.election.startedAt.IsZero())
 	})

@@ -61,6 +61,7 @@ func TestRegisterWatcher(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, r)
 		assert.True(t, r.Success)
+		server.Stop()
 	})
 
 	t.Run("Should receive heartbeat after registering", func(t *testing.T) {
@@ -73,7 +74,7 @@ func TestRegisterWatcher(t *testing.T) {
 
 		leader := New(
 			watcher.New(igrpc.NewWatchClient("localhost:50051")),
-			monitor.New(monitor.WithHeartBeat(igrpc.NewNotifier(), 1*time.Second)),
+			monitor.New(monitor.WithHeartBeat(igrpc.NewNotifier(), 3*time.Millisecond)),
 			p,
 			config)
 		go func() {
@@ -93,9 +94,10 @@ func TestRegisterWatcher(t *testing.T) {
 			}
 		}()
 		go w.StartHeartBeatChecking()
-		time.Sleep(3 * time.Second)
+		time.Sleep(9 * time.Millisecond)
 		assert.True(t, w.LastReceivedBeat().After(ref))
 		w.StopHeartBeatChecking()
+		leader.Stop()
 	})
 }
 
@@ -128,6 +130,7 @@ func TestAppStart(t *testing.T) {
 
 		time.Sleep(2 * time.Second)
 		assert.True(t, createCalled)
+		server.Stop()
 
 	})
 
@@ -154,7 +157,7 @@ func TestAppStart(t *testing.T) {
 
 		app := New(
 			watcher.New(igrpc.NewWatchClient("localhost:50051")),
-			monitor.New(monitor.WithHealthCheck(fmt.Sprintf("http://%s%s", server.Listener.Addr(), "/health"), 1*time.Second, 3)),
+			monitor.New(monitor.WithHealthCheck(fmt.Sprintf("http://%s%s", server.Listener.Addr(), "/health"), 5*time.Millisecond, 3)),
 			provisioner.WithProvider(provider),
 			config,
 		)
@@ -165,7 +168,7 @@ func TestAppStart(t *testing.T) {
 			}
 		}()
 
-		time.Sleep(2 * time.Second)
+		time.Sleep(10 * time.Millisecond)
 		assert.True(t, healthCalled)
 		assert.True(t, app.monitor.IsHealthy())
 		server.Close()
@@ -187,7 +190,7 @@ func TestApp(t *testing.T) {
 
 		leader := New(
 			watcher.New(igrpc.NewWatchClient("localhost:50051")),
-			monitor.New(monitor.WithHeartBeat(igrpc.NewNotifier(), 1*time.Second)),
+			monitor.New(monitor.WithHeartBeat(igrpc.NewNotifier(), 5*time.Millisecond)),
 			provisioner.WithProvider(provider),
 			config,
 		)
@@ -226,12 +229,12 @@ func TestApp(t *testing.T) {
 			}
 		}()
 
-		time.Sleep(2 * time.Second)
+		time.Sleep(10 * time.Millisecond)
 		assert.True(t, leader.isLeader)
 		assert.False(t, node1.isLeader)
 		assert.False(t, node2.isLeader)
 		leader.Stop()
-		time.Sleep(3 * time.Second)
+		time.Sleep(15 * time.Millisecond)
 		assert.True(t, node1.isLeader || node2.isLeader)
 		node1.Stop()
 		node2.Stop()
