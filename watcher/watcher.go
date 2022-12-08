@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"math/rand"
 	"sync"
 	"time"
 )
@@ -30,6 +31,7 @@ type Watcher struct {
 	Address                           string
 	registerLocker                    sync.Locker
 	election                          *election
+	maxMillisDelayForElection         int64
 	priority                          int32
 }
 
@@ -39,6 +41,7 @@ func New(client Client) *Watcher {
 		checkHeartBeatInterval:            1 * time.Second,
 		maxLeaderAliveInterval:            15 * time.Second,
 		minLeaderDownNotificationInterval: 20 * time.Second,
+		maxMillisDelayForElection:         1000,
 		doneHeartBeatChecking:             make(chan struct{}),
 		registerLocker:                    &sync.Mutex{},
 	}
@@ -107,11 +110,14 @@ func (w *Watcher) onNoReceivedHeartBeat() {
 }
 
 func (w *Watcher) startElection() {
-	w.election = newElection(w.nodes)
-	err := w.election.start()
-	if err != nil {
-		log.Printf("Failed to start election: %s", err)
-	}
+	t := rand.Int63n(w.maxMillisDelayForElection)
+	time.AfterFunc(time.Duration(t)*time.Millisecond, func() {
+		w.election = newElection(w.nodes)
+		err := w.election.start()
+		if err != nil {
+			log.Printf("Failed to start election: %s", err)
+		}
+	})
 }
 
 func (w *Watcher) RegisterNode(n *NodeInfo, key string) ([]*NodeInfo, error) {

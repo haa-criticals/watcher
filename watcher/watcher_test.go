@@ -163,6 +163,32 @@ func TestWatcher(t *testing.T) {
 		assert.False(t, w.election.startedAt.IsZero())
 	})
 
+	t.Run("Election should start with random delay", func(t *testing.T) {
+		w := &Watcher{
+			maxMillisDelayForElection: 30,
+			nodes: []*NodeInfo{
+				{"192.168.0.10", 1},
+			},
+		}
+
+		timeRef := time.Now()
+		w.startElection()
+		time.Sleep(50 * time.Millisecond)
+		assert.True(t, w.election.startedAt.After(timeRef))
+
+		timeDiff := w.election.startedAt.Sub(timeRef)
+
+		timeRef = time.Now()
+		w.startElection()
+		time.Sleep(50 * time.Millisecond)
+		assert.True(t, w.election.startedAt.After(timeRef))
+
+		timeDiff2 := w.election.startedAt.Sub(timeRef)
+
+		assert.NotEqual(t, timeDiff, timeDiff2)
+
+	})
+
 	t.Run("Should register nodes", func(t *testing.T) {
 		w := &Watcher{
 			registrationKey: "key",
