@@ -217,6 +217,15 @@ func TestWatcher(t *testing.T) {
 		assert.Equal(t, w.Address, w.votedFor)
 	})
 
+	t.Run("Should deny vote if term is lower than current term", func(t *testing.T) {
+		w := &Watcher{
+			term: 2,
+		}
+
+		r := w.OnReceiveVoteRequest(1)
+		assert.False(t, r.Granted)
+	})
+
 	t.Run("Should register nodes", func(t *testing.T) {
 		w := &Watcher{
 			registrationKey: "key",

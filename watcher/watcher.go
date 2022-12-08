@@ -194,3 +194,14 @@ func (w *Watcher) OnNewLeader(leader *NodeInfo) {
 		w.StartHeartBeatChecking()
 	}
 }
+
+func (w *Watcher) OnReceiveVoteRequest(term int64) *VoteResponse {
+	if term < w.term {
+		return &VoteResponse{
+			Granted: false,
+		}
+	}
+	return &VoteResponse{
+		Granted: true,
+	}
+}

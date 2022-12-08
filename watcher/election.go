@@ -13,6 +13,10 @@ type ElectionRequest struct {
 	StartedAt time.Time
 }
 
+type VoteResponse struct {
+	Granted bool
+}
+
 type election struct {
 	nodes     []*NodeInfo
 	startedAt time.Time
