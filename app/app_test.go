@@ -39,7 +39,13 @@ func TestRegisterWatcher(t *testing.T) {
 		config := &Config{
 			Port: 50051,
 		}
-		server := New(watcher.New(igrpc.NewWatchClient("localhost:50051")), monitor.New(), nil, config)
+
+		p := provisioner.WithProvider(&mockProvider{
+			fCreate: func(ctx context.Context) error {
+				return nil
+			},
+		})
+		server := New(watcher.New(igrpc.NewWatchClient("localhost:50051")), monitor.New(), p, config)
 		go func() {
 			err := server.Start()
 			if err != nil {
@@ -61,10 +67,14 @@ func TestRegisterWatcher(t *testing.T) {
 		config := &Config{
 			Port: 50051,
 		}
+		p := provisioner.WithProvider(&mockProvider{fCreate: func(ctx context.Context) error {
+			return nil
+		}})
+
 		leader := New(
 			watcher.New(igrpc.NewWatchClient("localhost:50051")),
 			monitor.New(monitor.WithHeartBeat(igrpc.NewNotifier(), 1*time.Second)),
-			nil,
+			p,
 			config)
 		go func() {
 			err := leader.Start()
