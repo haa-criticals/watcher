@@ -202,6 +202,21 @@ func TestWatcher(t *testing.T) {
 		assert.Equal(t, int64(2), w.term)
 	})
 
+	t.Run("Should vote for itself when start an election", func(t *testing.T) {
+		w := &Watcher{
+			Address:                   "192.168.0.1",
+			term:                      1,
+			maxMillisDelayForElection: 1,
+			nodes: []*NodeInfo{
+				{"192.168.0.10", 1},
+			},
+		}
+
+		w.startElection()
+		time.Sleep(2 * time.Millisecond)
+		assert.Equal(t, w.Address, w.votedFor)
+	})
+
 	t.Run("Should register nodes", func(t *testing.T) {
 		w := &Watcher{
 			registrationKey: "key",

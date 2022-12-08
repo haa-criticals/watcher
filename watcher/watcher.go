@@ -34,6 +34,7 @@ type Watcher struct {
 	maxMillisDelayForElection         int64
 	priority                          int32
 	term                              int64
+	votedFor                          string
 }
 
 func New(client Client) *Watcher {
@@ -115,6 +116,7 @@ func (w *Watcher) startElection() {
 	time.AfterFunc(time.Duration(t)*time.Millisecond, func() {
 		w.election = newElection(w.nodes)
 		w.term++
+		w.votedFor = w.Address
 		err := w.election.start()
 		if err != nil {
 			log.Printf("Failed to start election: %s", err)
