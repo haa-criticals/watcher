@@ -222,7 +222,7 @@ func TestWatcher(t *testing.T) {
 			term: 2,
 		}
 
-		r := w.OnReceiveVoteRequest(1, 0)
+		r := w.OnReceiveVoteRequest(1, 0, "")
 		assert.False(t, r.Granted)
 	})
 
@@ -232,7 +232,7 @@ func TestWatcher(t *testing.T) {
 			votedFor: "192.168.0.10",
 		}
 
-		r := w.OnReceiveVoteRequest(2, 0)
+		r := w.OnReceiveVoteRequest(2, 0, "")
 		assert.False(t, r.Granted)
 	})
 
@@ -242,8 +242,29 @@ func TestWatcher(t *testing.T) {
 			priority: 2,
 		}
 
-		r := w.OnReceiveVoteRequest(2, 1)
+		r := w.OnReceiveVoteRequest(2, 1, "")
 		assert.False(t, r.Granted)
+	})
+
+	t.Run("Should grant vote", func(t *testing.T) {
+		w := &Watcher{
+			term:     2,
+			priority: 1,
+		}
+
+		r := w.OnReceiveVoteRequest(2, 1, "")
+		assert.True(t, r.Granted)
+	})
+
+	t.Run("Should set votedFor when grant vote", func(t *testing.T) {
+		w := &Watcher{
+			term:     2,
+			priority: 1,
+		}
+
+		r := w.OnReceiveVoteRequest(2, 1, "192.168.0.10")
+		assert.True(t, r.Granted)
+		assert.Equal(t, "192.168.0.10", w.votedFor)
 	})
 
 	t.Run("Should register nodes", func(t *testing.T) {

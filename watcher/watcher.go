@@ -195,12 +195,13 @@ func (w *Watcher) OnNewLeader(leader *NodeInfo) {
 	}
 }
 
-func (w *Watcher) OnReceiveVoteRequest(term int64, priority int32) *VoteResponse {
+func (w *Watcher) OnReceiveVoteRequest(term int64, priority int32, candidate string) *VoteResponse {
 	if term < w.term || w.priority > priority || (w.term == term && w.votedFor != "") {
 		return &VoteResponse{
 			Granted: false,
 		}
 	}
+	w.votedFor = candidate
 	return &VoteResponse{
 		Granted: true,
 	}
