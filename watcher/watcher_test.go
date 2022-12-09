@@ -222,7 +222,7 @@ func TestWatcher(t *testing.T) {
 			term: 2,
 		}
 
-		r := w.OnReceiveVoteRequest(1)
+		r := w.OnReceiveVoteRequest(1, 0)
 		assert.False(t, r.Granted)
 	})
 
@@ -232,7 +232,17 @@ func TestWatcher(t *testing.T) {
 			votedFor: "192.168.0.10",
 		}
 
-		r := w.OnReceiveVoteRequest(2)
+		r := w.OnReceiveVoteRequest(2, 0)
+		assert.False(t, r.Granted)
+	})
+
+	t.Run("Should deny vote if it has a higher priority than the candidate", func(t *testing.T) {
+		w := &Watcher{
+			term:     2,
+			priority: 2,
+		}
+
+		r := w.OnReceiveVoteRequest(2, 1)
 		assert.False(t, r.Granted)
 	})
 

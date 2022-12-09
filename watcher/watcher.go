@@ -195,8 +195,8 @@ func (w *Watcher) OnNewLeader(leader *NodeInfo) {
 	}
 }
 
-func (w *Watcher) OnReceiveVoteRequest(term int64) *VoteResponse {
-	if term < w.term || (w.term == term && w.votedFor != "") {
+func (w *Watcher) OnReceiveVoteRequest(term int64, priority int32) *VoteResponse {
+	if term < w.term || w.priority > priority || (w.term == term && w.votedFor != "") {
 		return &VoteResponse{
 			Granted: false,
 		}
