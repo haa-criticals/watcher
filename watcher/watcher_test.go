@@ -267,6 +267,17 @@ func TestWatcher(t *testing.T) {
 		assert.Equal(t, "192.168.0.10", w.votedFor)
 	})
 
+	t.Run("Update the term when vote is granted", func(t *testing.T) {
+		w := &Watcher{
+			term:     2,
+			priority: 1,
+		}
+
+		r := w.OnReceiveVoteRequest(3, 1, "192.168.0.10")
+		assert.True(t, r.Granted)
+		assert.Equal(t, int64(3), w.term)
+	})
+
 	t.Run("Should register nodes", func(t *testing.T) {
 		w := &Watcher{
 			registrationKey: "key",

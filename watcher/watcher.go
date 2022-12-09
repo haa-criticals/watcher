@@ -202,6 +202,7 @@ func (w *Watcher) OnReceiveVoteRequest(term int64, priority int32, candidate str
 		}
 	}
 	w.votedFor = candidate
+	w.term = term
 	return &VoteResponse{
 		Granted: true,
 	}
