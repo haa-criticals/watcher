@@ -222,7 +222,7 @@ func TestWatcher(t *testing.T) {
 			term: 2,
 		}
 
-		r := w.OnReceiveVoteRequest(1, 0, "")
+		r := w.OnReceiveVoteRequest(&VoteRequest{Term: 1})
 		assert.False(t, r.Granted)
 	})
 
@@ -232,7 +232,7 @@ func TestWatcher(t *testing.T) {
 			votedFor: "192.168.0.10",
 		}
 
-		r := w.OnReceiveVoteRequest(2, 0, "")
+		r := w.OnReceiveVoteRequest(&VoteRequest{Term: 2})
 		assert.False(t, r.Granted)
 	})
 
@@ -242,7 +242,7 @@ func TestWatcher(t *testing.T) {
 			priority: 2,
 		}
 
-		r := w.OnReceiveVoteRequest(2, 1, "")
+		r := w.OnReceiveVoteRequest(&VoteRequest{Term: 2, Priority: 1})
 		assert.False(t, r.Granted)
 	})
 
@@ -252,7 +252,7 @@ func TestWatcher(t *testing.T) {
 			priority: 2,
 		}
 
-		r := w.OnReceiveVoteRequest(2, 1, "")
+		r := w.OnReceiveVoteRequest(&VoteRequest{Term: 2, Priority: 1})
 		assert.False(t, r.Granted)
 		assert.Equal(t, int64(2), r.Term)
 	})
@@ -263,7 +263,7 @@ func TestWatcher(t *testing.T) {
 			priority: 1,
 		}
 
-		r := w.OnReceiveVoteRequest(2, 1, "")
+		r := w.OnReceiveVoteRequest(&VoteRequest{Term: 2, Priority: 1})
 		assert.True(t, r.Granted)
 	})
 
@@ -273,7 +273,7 @@ func TestWatcher(t *testing.T) {
 			priority: 1,
 		}
 
-		r := w.OnReceiveVoteRequest(2, 1, "192.168.0.10")
+		r := w.OnReceiveVoteRequest(&VoteRequest{2, "192.168.0.10", 1})
 		assert.True(t, r.Granted)
 		assert.Equal(t, "192.168.0.10", w.votedFor)
 	})
@@ -284,7 +284,7 @@ func TestWatcher(t *testing.T) {
 			priority: 1,
 		}
 
-		r := w.OnReceiveVoteRequest(3, 1, "192.168.0.10")
+		r := w.OnReceiveVoteRequest(&VoteRequest{3, "192.168.0.10", 1})
 		assert.True(t, r.Granted)
 		assert.Equal(t, int64(3), w.term)
 	})

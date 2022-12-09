@@ -11,7 +11,18 @@ import (
 
 type NodeInfo struct {
 	Address  string
-	priority int32
+	Priority int32
+}
+
+type VoteResponse struct {
+	Granted bool
+	Term    int64
+}
+
+type VoteRequest struct {
+	Term      int64
+	Candidate string
+	Priority  int32
 }
 
 type Watcher struct {
@@ -110,8 +121,10 @@ func (w *Watcher) onNoReceivedHeartBeat() {
 		go w.startElection()
 	}
 }
-
 func (w *Watcher) startElection() {
+	if w.maxMillisDelayForElection <= 0 {
+		w.maxMillisDelayForElection = 1
+	}
 	t := rand.Int63n(w.maxMillisDelayForElection)
 	time.AfterFunc(time.Duration(t)*time.Millisecond, func() {
 		w.election = newElection(w.nodes)
@@ -195,15 +208,15 @@ func (w *Watcher) OnNewLeader(leader *NodeInfo) {
 	}
 }
 
-func (w *Watcher) OnReceiveVoteRequest(term int64, priority int32, candidate string) *VoteResponse {
-	if term < w.term || w.priority > priority || (w.term == term && w.votedFor != "") {
+func (w *Watcher) OnReceiveVoteRequest(request *VoteRequest) *VoteResponse {
+	if request.Term < w.term || w.priority > request.Priority || (w.term == request.Term && w.votedFor != "") {
 		return &VoteResponse{
 			Granted: false,
 			Term:    w.term,
 		}
 	}
-	w.votedFor = candidate
-	w.term = term
+	w.votedFor = request.Candidate
+	w.term = request.Term
 	return &VoteResponse{
 		Granted: true,
 		Term:    w.term,
