@@ -226,6 +226,16 @@ func TestWatcher(t *testing.T) {
 		assert.False(t, r.Granted)
 	})
 
+	t.Run("Should deny vote if already voted for another node", func(t *testing.T) {
+		w := &Watcher{
+			term:     2,
+			votedFor: "192.168.0.10",
+		}
+
+		r := w.OnReceiveVoteRequest(2)
+		assert.False(t, r.Granted)
+	})
+
 	t.Run("Should register nodes", func(t *testing.T) {
 		w := &Watcher{
 			registrationKey: "key",
