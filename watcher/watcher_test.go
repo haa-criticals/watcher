@@ -246,6 +246,17 @@ func TestWatcher(t *testing.T) {
 		assert.False(t, r.Granted)
 	})
 
+	t.Run("Should return the current term when vote is denied", func(t *testing.T) {
+		w := &Watcher{
+			term:     2,
+			priority: 2,
+		}
+
+		r := w.OnReceiveVoteRequest(2, 1, "")
+		assert.False(t, r.Granted)
+		assert.Equal(t, int64(2), r.Term)
+	})
+
 	t.Run("Should grant vote", func(t *testing.T) {
 		w := &Watcher{
 			term:     2,

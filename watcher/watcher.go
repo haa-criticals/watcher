@@ -199,11 +199,13 @@ func (w *Watcher) OnReceiveVoteRequest(term int64, priority int32, candidate str
 	if term < w.term || w.priority > priority || (w.term == term && w.votedFor != "") {
 		return &VoteResponse{
 			Granted: false,
+			Term:    w.term,
 		}
 	}
 	w.votedFor = candidate
 	w.term = term
 	return &VoteResponse{
 		Granted: true,
+		Term:    w.term,
 	}
 }

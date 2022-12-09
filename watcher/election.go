@@ -15,6 +15,7 @@ type ElectionRequest struct {
 
 type VoteResponse struct {
 	Granted bool
+	Term    int64
 }
 
 type election struct {
