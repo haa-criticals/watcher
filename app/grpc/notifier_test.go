@@ -15,7 +15,8 @@ import (
 
 type recorderServer struct {
 	pb.UnimplementedWatcherServer
-	beats []time.Time
+	beats  []time.Time
+	server *grpc.Server
 }
 
 func (r *recorderServer) Heartbeat(_ context.Context, beat *pb.Beat) (*emptypb.Empty, error) {
@@ -30,6 +31,7 @@ func startRecorderServer(server *recorderServer) error {
 	}
 	s := grpc.NewServer()
 	pb.RegisterWatcherServer(s, server)
+	server.server = s
 	return s.Serve(listen)
 }
 
@@ -47,5 +49,6 @@ func TestNotifier(t *testing.T) {
 		err := notifier.Beat("localhost:50051")
 		assert.NoError(t, err)
 		assert.Len(t, server.beats, 1)
+		server.server.Stop()
 	})
 }

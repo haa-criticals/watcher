@@ -176,6 +176,7 @@ func TestAppStart(t *testing.T) {
 		assert.True(t, healthCalled)
 		assert.True(t, app.monitor.IsHealthy())
 		server.Close()
+		app.Stop()
 	})
 }
 
