@@ -60,6 +60,7 @@ to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		w := watcher.New(
 			grpc.NewWatchClient(address),
+			watcher.Config{},
 		)
 		m := monitor.New(
 			monitor.WithHeartBeat(grpc.NewNotifier(), 5*time.Second),

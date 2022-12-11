@@ -45,7 +45,10 @@ func TestRegisterWatcher(t *testing.T) {
 				return nil
 			},
 		})
-		server := New(watcher.New(igrpc.NewWatchClient("localhost:50051")), monitor.New(), p, config)
+
+		w := watcher.New(igrpc.NewWatchClient("localhost:50051"), watcher.Config{})
+
+		server := New(w, monitor.New(), p, config)
 		go func() {
 			err := server.Start()
 			if err != nil {
@@ -73,7 +76,7 @@ func TestRegisterWatcher(t *testing.T) {
 		}})
 
 		leader := New(
-			watcher.New(igrpc.NewWatchClient("localhost:50051")),
+			watcher.New(igrpc.NewWatchClient("localhost:50051"), watcher.Config{}),
 			monitor.New(monitor.WithHeartBeat(igrpc.NewNotifier(), 3*time.Millisecond)),
 			p,
 			config)
@@ -85,7 +88,7 @@ func TestRegisterWatcher(t *testing.T) {
 		}()
 
 		ref := time.Now()
-		w := watcher.New(igrpc.NewWatchClient("localhost:50052"))
+		w := watcher.New(igrpc.NewWatchClient("localhost:50052"), watcher.Config{})
 		node := New(w, monitor.New(), nil, &Config{Port: 50052, Leader: "localhost:50051", Address: "localhost:50052"})
 		go func() {
 			err := node.Start()
@@ -98,6 +101,7 @@ func TestRegisterWatcher(t *testing.T) {
 		assert.True(t, w.LastReceivedBeat().After(ref))
 		w.StopHeartBeatChecking()
 		leader.Stop()
+		node.Stop()
 	})
 }
 
@@ -116,7 +120,7 @@ func TestAppStart(t *testing.T) {
 		}
 
 		server := New(
-			watcher.New(igrpc.NewWatchClient("localhost:50051")),
+			watcher.New(igrpc.NewWatchClient("localhost:50051"), watcher.Config{}),
 			monitor.New(),
 			provisioner.WithProvider(provider),
 			config,
@@ -156,7 +160,7 @@ func TestAppStart(t *testing.T) {
 		}
 
 		app := New(
-			watcher.New(igrpc.NewWatchClient("localhost:50051")),
+			watcher.New(igrpc.NewWatchClient("localhost:50051"), watcher.Config{}),
 			monitor.New(monitor.WithHealthCheck(fmt.Sprintf("http://%s%s", server.Listener.Addr(), "/health"), 5*time.Millisecond, 3)),
 			provisioner.WithProvider(provider),
 			config,
@@ -177,10 +181,6 @@ func TestAppStart(t *testing.T) {
 
 func TestApp(t *testing.T) {
 	t.Run("A new leader should be elected when the current leader is down", func(t *testing.T) {
-		config := &Config{
-			Port:    50051,
-			Address: "localhost:50051",
-		}
 
 		provider := &mockProvider{
 			fCreate: func(ctx context.Context) error {
@@ -189,10 +189,10 @@ func TestApp(t *testing.T) {
 		}
 
 		leader := New(
-			watcher.New(igrpc.NewWatchClient("localhost:50051")),
+			watcher.New(igrpc.NewWatchClient("localhost:50051"), watcher.Config{}),
 			monitor.New(monitor.WithHeartBeat(igrpc.NewNotifier(), 5*time.Millisecond)),
 			provisioner.WithProvider(provider),
-			config,
+			&Config{Port: 50051, Address: "localhost:50051"},
 		)
 		go func() {
 			err := leader.Start()
@@ -202,7 +202,7 @@ func TestApp(t *testing.T) {
 		}()
 
 		node1 := New(
-			watcher.New(igrpc.NewWatchClient("localhost:50052")),
+			watcher.New(igrpc.NewWatchClient("localhost:50052"), watcher.Config{}),
 			monitor.New(),
 			provisioner.WithProvider(provider),
 			&Config{Port: 50052, Leader: "localhost:50051", Address: "localhost:50052"},
@@ -216,7 +216,7 @@ func TestApp(t *testing.T) {
 		}()
 
 		node2 := New(
-			watcher.New(igrpc.NewWatchClient("localhost:50053")),
+			watcher.New(igrpc.NewWatchClient("localhost:50053"), watcher.Config{}),
 			monitor.New(),
 			provisioner.WithProvider(provider),
 			&Config{Port: 50053, Leader: "localhost:50051", Address: "localhost:50053"},

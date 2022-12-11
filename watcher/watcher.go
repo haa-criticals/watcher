@@ -25,38 +25,56 @@ type VoteRequest struct {
 	Priority  int32
 }
 
-type Watcher struct {
-	leader                            *NodeInfo
-	lastReceivedBeat                  time.Time
-	checkHeartBeatInterval            time.Duration
-	maxLeaderAliveInterval            time.Duration
-	doneHeartBeatChecking             chan struct{}
-	checkingHeartBeat                 bool
-	checkingHeartBeatLock             sync.Mutex
-	lastLeaderDownNotificationTime    time.Time
-	minLeaderDownNotificationInterval time.Duration
-	OnLeaderDown                      func(leader *NodeInfo, nodes []*NodeInfo, lastBeat time.Time)
-	nodes                             []*NodeInfo
-	registrationKey                   string
-	client                            Client
-	Address                           string
-	registerLocker                    sync.Locker
-	election                          *election
-	maxMillisDelayForElection         int64
-	priority                          int32
-	term                              int64
-	votedFor                          string
+type Config struct {
+	RegistrationKey                string
+	Address                        string
+	Priority                       int32
+	HeartBeatCheckInterval         time.Duration
+	LeaderAliveInterval            time.Duration
+	LeaderDownNotificationInterval time.Duration
+	MaxDelayForElection            int64
 }
 
-func New(client Client) *Watcher {
+type Watcher struct {
+	leader                         *NodeInfo
+	lastReceivedBeat               time.Time
+	doneHeartBeatChecking          chan struct{}
+	checkingHeartBeat              bool
+	checkingHeartBeatLock          sync.Mutex
+	lastLeaderDownNotificationTime time.Time
+	OnLeaderDown                   func(leader *NodeInfo, nodes []*NodeInfo, lastBeat time.Time)
+	nodes                          []*NodeInfo
+	client                         Client
+	Address                        string
+	registerLocker                 sync.Locker
+	election                       *election
+	maxMillisDelayForElection      int64
+	term                           int64
+	votedFor                       string
+	config                         Config
+}
+
+func New(client Client, config Config) *Watcher {
+	if config.HeartBeatCheckInterval == 0 {
+		config.HeartBeatCheckInterval = 1 * time.Second
+	}
+
+	if config.LeaderAliveInterval == 0 {
+		config.LeaderAliveInterval = 15 * time.Second
+	}
+
+	if config.LeaderDownNotificationInterval == 0 {
+		config.LeaderDownNotificationInterval = 20 * time.Second
+	}
+
+	if config.MaxDelayForElection == 0 {
+		config.MaxDelayForElection = 1000
+	}
 	return &Watcher{
-		client:                            client,
-		checkHeartBeatInterval:            1 * time.Second,
-		maxLeaderAliveInterval:            15 * time.Second,
-		minLeaderDownNotificationInterval: 20 * time.Second,
-		maxMillisDelayForElection:         1000,
-		doneHeartBeatChecking:             make(chan struct{}),
-		registerLocker:                    &sync.Mutex{},
+		client:                client,
+		config:                config,
+		doneHeartBeatChecking: make(chan struct{}),
+		registerLocker:        &sync.Mutex{},
 	}
 }
 
@@ -75,7 +93,7 @@ func (w *Watcher) StartHeartBeatChecking() {
 	w.checkingHeartBeat = true
 	w.checkingHeartBeatLock.Unlock()
 
-	t := time.NewTicker(w.checkHeartBeatInterval)
+	t := time.NewTicker(w.config.HeartBeatCheckInterval)
 	for {
 		select {
 		case <-t.C:
@@ -90,55 +108,11 @@ func (w *Watcher) StartHeartBeatChecking() {
 }
 
 func (w *Watcher) isLeaderAlive() bool {
-	return time.Now().Sub(w.lastReceivedBeat) < w.maxLeaderAliveInterval
-}
-
-func (w *Watcher) StopHeartBeatChecking() {
-	if w.checkingHeartBeat {
-		w.doneHeartBeatChecking <- struct{}{}
-		w.checkingHeartBeat = false
-	}
-}
-
-func (w *Watcher) OnReceiveHeartBeat(heartBeatTime time.Time) {
-	w.lastReceivedBeat = heartBeatTime
-	if !w.checkingHeartBeat {
-		go w.StartHeartBeatChecking()
-	}
-	log.Printf("Received heart beat from %v", w.leader)
-}
-
-func (w *Watcher) RegisterLeader(leader *NodeInfo) {
-	w.leader = leader
-}
-
-func (w *Watcher) onNoReceivedHeartBeat() {
-	if time.Now().Sub(w.lastLeaderDownNotificationTime) > w.minLeaderDownNotificationInterval {
-		w.lastLeaderDownNotificationTime = time.Now()
-		if w.OnLeaderDown != nil {
-			w.OnLeaderDown(w.leader, w.nodes, w.lastReceivedBeat)
-		}
-		go w.startElection()
-	}
-}
-func (w *Watcher) startElection() {
-	if w.maxMillisDelayForElection <= 0 {
-		w.maxMillisDelayForElection = 1
-	}
-	t := rand.Int63n(w.maxMillisDelayForElection)
-	time.AfterFunc(time.Duration(t)*time.Millisecond, func() {
-		w.election = newElection(w.nodes)
-		w.term++
-		w.votedFor = w.Address
-		err := w.election.start()
-		if err != nil {
-			log.Printf("Failed to start election: %s", err)
-		}
-	})
+	return time.Now().Sub(w.lastReceivedBeat) < w.config.LeaderAliveInterval
 }
 
 func (w *Watcher) RegisterNode(n *NodeInfo, key string) ([]*NodeInfo, error) {
-	if key != w.registrationKey {
+	if key != w.config.RegistrationKey {
 		return nil, errors.New("invalid registration key")
 	}
 	w.registerLocker.Lock()
@@ -180,7 +154,7 @@ func (w *Watcher) RequestRegister(endpoint, key string) error {
 
 func (w *Watcher) AckNode(info *NodeInfo, key string) error {
 	log.Printf("Received ack from %s", info.Address)
-	if key != w.registrationKey {
+	if key != w.config.RegistrationKey {
 		return errors.New("invalid registration key")
 	}
 	w.registerLocker.Lock()
@@ -189,6 +163,47 @@ func (w *Watcher) AckNode(info *NodeInfo, key string) error {
 	log.Printf("Acked node %s", info.Address)
 	log.Printf("Registered nodes: %v", w.nodes)
 	return nil
+}
+
+func (w *Watcher) StopHeartBeatChecking() {
+	if w.checkingHeartBeat {
+		w.doneHeartBeatChecking <- struct{}{}
+		w.checkingHeartBeat = false
+	}
+}
+
+func (w *Watcher) OnReceiveHeartBeat(heartBeatTime time.Time) {
+	w.lastReceivedBeat = heartBeatTime
+	if !w.checkingHeartBeat {
+		go w.StartHeartBeatChecking()
+	}
+	log.Printf("Received heart beat from %v", w.leader)
+}
+
+func (w *Watcher) RegisterLeader(leader *NodeInfo) {
+	w.leader = leader
+}
+
+func (w *Watcher) onNoReceivedHeartBeat() {
+	if time.Now().Sub(w.lastLeaderDownNotificationTime) > w.config.LeaderDownNotificationInterval {
+		w.lastLeaderDownNotificationTime = time.Now()
+		if w.OnLeaderDown != nil {
+			w.OnLeaderDown(w.leader, w.nodes, w.lastReceivedBeat)
+		}
+		go w.startElection()
+	}
+}
+func (w *Watcher) startElection() {
+	t := rand.Int63n(w.config.MaxDelayForElection)
+	time.AfterFunc(time.Duration(t)*time.Millisecond, func() {
+		w.election = newElection(w.nodes)
+		w.term++
+		w.votedFor = w.Address
+		err := w.election.start()
+		if err != nil {
+			log.Printf("Failed to start election: %s", err)
+		}
+	})
 }
 
 func (w *Watcher) LastReceivedBeat() time.Time {
@@ -209,7 +224,7 @@ func (w *Watcher) OnNewLeader(leader *NodeInfo) {
 }
 
 func (w *Watcher) OnReceiveVoteRequest(request *VoteRequest) *VoteResponse {
-	if request.Term < w.term || w.priority > request.Priority || (w.term == request.Term && w.votedFor != "") {
+	if request.Term < w.term || w.config.Priority > request.Priority || (w.term == request.Term && w.votedFor != "") {
 		return &VoteResponse{
 			Granted: false,
 			Term:    w.term,
