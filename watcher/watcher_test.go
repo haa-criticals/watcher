@@ -11,6 +11,7 @@ import (
 type mockWatcherClient struct {
 	fRequestRegister func(ctx context.Context, address, key string) (*RegisterResponse, error)
 	fAckNode         func(ctx context.Context, address, key string, node *NodeInfo) (*NodeInfo, error)
+	fRequestVote     func(ctx context.Context, address, candidate string, term int64) (*Vote, error)
 }
 
 func (m *mockWatcherClient) RequestRegister(ctx context.Context, address, key string) (*RegisterResponse, error) {
@@ -19,6 +20,10 @@ func (m *mockWatcherClient) RequestRegister(ctx context.Context, address, key st
 
 func (m *mockWatcherClient) AckNode(ctx context.Context, address, key string, node *NodeInfo) (*NodeInfo, error) {
 	return m.fAckNode(ctx, address, key, node)
+}
+
+func (m *mockWatcherClient) RequestVote(ctx context.Context, address, candidate string, term int64) (*Vote, error) {
+	return m.fRequestVote(ctx, address, candidate, term)
 }
 
 func TestWatcher(t *testing.T) {
@@ -147,23 +152,13 @@ func TestWatcher(t *testing.T) {
 
 	t.Run("Should create an election if leader is down", func(t *testing.T) {
 		w := &Watcher{
-			config: Config{
-				HeartBeatCheckInterval:         5 * time.Millisecond,
-				LeaderAliveInterval:            10 * time.Millisecond,
-				LeaderDownNotificationInterval: 15 * time.Millisecond,
-				MaxDelayForElection:            1,
+			client: &mockWatcherClient{
+				fRequestVote: func(ctx context.Context, address, candidate string, term int64) (*Vote, error) {
+					return &Vote{
+						Granted: true,
+					}, nil
+				},
 			},
-			lastReceivedBeat: time.Now(),
-			leader:           &NodeInfo{},
-		}
-
-		go w.StartHeartBeatChecking()
-		time.Sleep(20 * time.Millisecond)
-		assert.NotNil(t, w.election)
-	})
-
-	t.Run("Should start an election if leader is down", func(t *testing.T) {
-		w := &Watcher{
 			config: Config{
 				HeartBeatCheckInterval:         5 * time.Millisecond,
 				LeaderAliveInterval:            10 * time.Millisecond,
@@ -173,8 +168,36 @@ func TestWatcher(t *testing.T) {
 			lastReceivedBeat: time.Now(),
 			leader:           &NodeInfo{},
 			nodes: []*NodeInfo{
-				{"192.168.0.10", 1},
-				{"191.168.0.11", 2},
+				{"node1"},
+				{"node2"},
+			},
+		}
+
+		go w.StartHeartBeatChecking()
+		time.Sleep(20 * time.Millisecond)
+		assert.NotNil(t, w.election)
+	})
+
+	t.Run("Should start an election if leader is down", func(t *testing.T) {
+		w := &Watcher{
+			client: &mockWatcherClient{
+				fRequestVote: func(ctx context.Context, address, candidate string, term int64) (*Vote, error) {
+					return &Vote{
+						Granted: true,
+					}, nil
+				},
+			},
+			config: Config{
+				HeartBeatCheckInterval:         5 * time.Millisecond,
+				LeaderAliveInterval:            10 * time.Millisecond,
+				LeaderDownNotificationInterval: 15 * time.Millisecond,
+				MaxDelayForElection:            1,
+			},
+			lastReceivedBeat: time.Now(),
+			leader:           &NodeInfo{},
+			nodes: []*NodeInfo{
+				{"192.168.0.10"},
+				{"191.168.0.11"},
 			},
 		}
 
@@ -186,9 +209,16 @@ func TestWatcher(t *testing.T) {
 
 	t.Run("Election should start with random delay", func(t *testing.T) {
 		w := &Watcher{
+			client: &mockWatcherClient{
+				fRequestVote: func(ctx context.Context, address, candidate string, term int64) (*Vote, error) {
+					return &Vote{
+						Granted: true,
+					}, nil
+				},
+			},
 			config: Config{MaxDelayForElection: 30},
 			nodes: []*NodeInfo{
-				{"192.168.0.10", 1},
+				{"192.168.0.10"},
 			},
 		}
 
@@ -211,10 +241,17 @@ func TestWatcher(t *testing.T) {
 
 	t.Run("Should increment the term when start an election", func(t *testing.T) {
 		w := &Watcher{
+			client: &mockWatcherClient{
+				fRequestVote: func(ctx context.Context, address, candidate string, term int64) (*Vote, error) {
+					return &Vote{
+						Granted: true,
+					}, nil
+				},
+			},
 			term:   1,
 			config: Config{MaxDelayForElection: 1},
 			nodes: []*NodeInfo{
-				{"192.168.0.10", 1},
+				{"192.168.0.10"},
 			},
 		}
 
@@ -225,11 +262,18 @@ func TestWatcher(t *testing.T) {
 
 	t.Run("Should vote for itself when start an election", func(t *testing.T) {
 		w := &Watcher{
+			client: &mockWatcherClient{
+				fRequestVote: func(ctx context.Context, address, candidate string, term int64) (*Vote, error) {
+					return &Vote{
+						Granted: true,
+					}, nil
+				},
+			},
 			Address: "192.168.0.1",
 			term:    1,
 			config:  Config{MaxDelayForElection: 1},
 			nodes: []*NodeInfo{
-				{"192.168.0.10", 1},
+				{"192.168.0.10"},
 			},
 		}
 
@@ -243,7 +287,7 @@ func TestWatcher(t *testing.T) {
 			term: 2,
 		}
 
-		r := w.OnReceiveVoteRequest(&VoteRequest{Term: 1})
+		r := w.OnReceiveVoteRequest(&Candidate{Term: 1})
 		assert.False(t, r.Granted)
 	})
 
@@ -253,7 +297,7 @@ func TestWatcher(t *testing.T) {
 			votedFor: "192.168.0.10",
 		}
 
-		r := w.OnReceiveVoteRequest(&VoteRequest{Term: 2})
+		r := w.OnReceiveVoteRequest(&Candidate{Term: 2})
 		assert.False(t, r.Granted)
 	})
 
@@ -263,7 +307,7 @@ func TestWatcher(t *testing.T) {
 			config: Config{Priority: 2},
 		}
 
-		r := w.OnReceiveVoteRequest(&VoteRequest{Term: 2, Priority: 1})
+		r := w.OnReceiveVoteRequest(&Candidate{Term: 2, Priority: 1})
 		assert.False(t, r.Granted)
 	})
 
@@ -273,7 +317,7 @@ func TestWatcher(t *testing.T) {
 			config: Config{Priority: 2},
 		}
 
-		r := w.OnReceiveVoteRequest(&VoteRequest{Term: 2, Priority: 1})
+		r := w.OnReceiveVoteRequest(&Candidate{Term: 2, Priority: 1})
 		assert.False(t, r.Granted)
 		assert.Equal(t, int64(2), r.Term)
 	})
@@ -284,7 +328,7 @@ func TestWatcher(t *testing.T) {
 			config: Config{Priority: 1},
 		}
 
-		r := w.OnReceiveVoteRequest(&VoteRequest{Term: 2, Priority: 1})
+		r := w.OnReceiveVoteRequest(&Candidate{Term: 2, Priority: 1})
 		assert.True(t, r.Granted)
 	})
 
@@ -294,7 +338,7 @@ func TestWatcher(t *testing.T) {
 			config: Config{Priority: 1},
 		}
 
-		r := w.OnReceiveVoteRequest(&VoteRequest{2, "192.168.0.10", 1})
+		r := w.OnReceiveVoteRequest(&Candidate{2, "192.168.0.10", 1})
 		assert.True(t, r.Granted)
 		assert.Equal(t, "192.168.0.10", w.votedFor)
 	})
@@ -305,7 +349,7 @@ func TestWatcher(t *testing.T) {
 			config: Config{Priority: 1},
 		}
 
-		r := w.OnReceiveVoteRequest(&VoteRequest{3, "192.168.0.10", 1})
+		r := w.OnReceiveVoteRequest(&Candidate{3, "192.168.0.10", 1})
 		assert.True(t, r.Granted)
 		assert.Equal(t, int64(3), w.term)
 	})

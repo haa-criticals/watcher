@@ -9,12 +9,8 @@ type RegisterResponse struct {
 	Nodes   []*NodeInfo
 }
 
-type ElectionResponse struct {
-	Accepted bool
-	Node     *NodeInfo
-}
-
 type Client interface {
 	RequestRegister(ctx context.Context, address, key string) (*RegisterResponse, error)
 	AckNode(ctx context.Context, address, key string, node *NodeInfo) (*NodeInfo, error)
+	RequestVote(ctx context.Context, address, candidate string, term int64) (*Vote, error)
 }

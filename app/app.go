@@ -85,7 +85,7 @@ func (a *App) Heartbeat(_ context.Context, in *pb.Beat) (*emptypb.Empty, error) 
 	return &emptypb.Empty{}, nil
 }
 
-func (a *App) RequestVote(ctx context.Context, request *pb.ElectionRequest) (*pb.ElectionResponse, error) {
+func (a *App) RequestVote(ctx context.Context, request *pb.Candidate) (*pb.Vote, error) {
 	return nil, errors.New("not implemented")
 }
 

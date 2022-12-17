@@ -10,19 +10,19 @@ import (
 )
 
 type NodeInfo struct {
-	Address  string
-	Priority int32
+	Address string
 }
 
-type VoteResponse struct {
+type Vote struct {
+	Adress  string
 	Granted bool
 	Term    int64
 }
 
-type VoteRequest struct {
-	Term      int64
-	Candidate string
-	Priority  int32
+type Candidate struct {
+	Term     int64
+	Address  string
+	Priority int32
 }
 
 type Config struct {
@@ -195,15 +195,25 @@ func (w *Watcher) onNoReceivedHeartBeat() {
 }
 func (w *Watcher) startElection() {
 	t := rand.Int63n(w.config.MaxDelayForElection)
-	time.AfterFunc(time.Duration(t)*time.Millisecond, func() {
-		w.election = newElection(w.nodes)
-		w.term++
-		w.votedFor = w.Address
-		err := w.election.start()
-		if err != nil {
-			log.Printf("Failed to start election: %s", err)
-		}
-	})
+	time.AfterFunc(time.Duration(t)*time.Millisecond, w.requestVotes)
+}
+
+func (w *Watcher) requestVotes() {
+	var err error
+	w.election, err = newElection(w.nodes)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	w.term++
+	w.votedFor = w.Address
+	for _, node := range w.election.nodes {
+		go w.requestVote(node)
+	}
+}
+
+func (w *Watcher) requestVote(node *NodeInfo) {
+	w.client.RequestVote(context.Background(), node.Address, w.Address, w.term)
 }
 
 func (w *Watcher) LastReceivedBeat() time.Time {
@@ -223,16 +233,16 @@ func (w *Watcher) OnNewLeader(leader *NodeInfo) {
 	}
 }
 
-func (w *Watcher) OnReceiveVoteRequest(request *VoteRequest) *VoteResponse {
+func (w *Watcher) OnReceiveVoteRequest(request *Candidate) *Vote {
 	if request.Term < w.term || w.config.Priority > request.Priority || (w.term == request.Term && w.votedFor != "") {
-		return &VoteResponse{
+		return &Vote{
 			Granted: false,
 			Term:    w.term,
 		}
 	}
-	w.votedFor = request.Candidate
+	w.votedFor = request.Address
 	w.term = request.Term
-	return &VoteResponse{
+	return &Vote{
 		Granted: true,
 		Term:    w.term,
 	}

@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"errors"
 	"github.com.haa-criticals/watcher/app/grpc/pb"
 	"github.com.haa-criticals/watcher/watcher"
 	"google.golang.org/grpc"
@@ -73,4 +74,8 @@ func (c *Client) AckNode(ctx context.Context, address, key string, node *watcher
 	}
 
 	return &watcher.NodeInfo{Address: res.Address}, err
+}
+
+func (c *Client) RequestVote(ctx context.Context, address, candidate string, term int64) (*watcher.Vote, error) {
+	return nil, errors.New("not implemented")
 }

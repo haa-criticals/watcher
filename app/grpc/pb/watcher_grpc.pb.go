@@ -26,7 +26,7 @@ type WatcherClient interface {
 	Register(ctx context.Context, in *RegisterRequest, opts ...grpc.CallOption) (*RegisterResponse, error)
 	AckNode(ctx context.Context, in *AckRequest, opts ...grpc.CallOption) (*Node, error)
 	Heartbeat(ctx context.Context, in *Beat, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	RequestVote(ctx context.Context, in *ElectionRequest, opts ...grpc.CallOption) (*ElectionResponse, error)
+	RequestVote(ctx context.Context, in *Candidate, opts ...grpc.CallOption) (*Vote, error)
 }
 
 type watcherClient struct {
@@ -64,8 +64,8 @@ func (c *watcherClient) Heartbeat(ctx context.Context, in *Beat, opts ...grpc.Ca
 	return out, nil
 }
 
-func (c *watcherClient) RequestVote(ctx context.Context, in *ElectionRequest, opts ...grpc.CallOption) (*ElectionResponse, error) {
-	out := new(ElectionResponse)
+func (c *watcherClient) RequestVote(ctx context.Context, in *Candidate, opts ...grpc.CallOption) (*Vote, error) {
+	out := new(Vote)
 	err := c.cc.Invoke(ctx, "/pb.Watcher/RequestVote", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -80,7 +80,7 @@ type WatcherServer interface {
 	Register(context.Context, *RegisterRequest) (*RegisterResponse, error)
 	AckNode(context.Context, *AckRequest) (*Node, error)
 	Heartbeat(context.Context, *Beat) (*emptypb.Empty, error)
-	RequestVote(context.Context, *ElectionRequest) (*ElectionResponse, error)
+	RequestVote(context.Context, *Candidate) (*Vote, error)
 	mustEmbedUnimplementedWatcherServer()
 }
 
@@ -97,7 +97,7 @@ func (UnimplementedWatcherServer) AckNode(context.Context, *AckRequest) (*Node, 
 func (UnimplementedWatcherServer) Heartbeat(context.Context, *Beat) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Heartbeat not implemented")
 }
-func (UnimplementedWatcherServer) RequestVote(context.Context, *ElectionRequest) (*ElectionResponse, error) {
+func (UnimplementedWatcherServer) RequestVote(context.Context, *Candidate) (*Vote, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RequestVote not implemented")
 }
 func (UnimplementedWatcherServer) mustEmbedUnimplementedWatcherServer() {}
@@ -168,7 +168,7 @@ func _Watcher_Heartbeat_Handler(srv interface{}, ctx context.Context, dec func(i
 }
 
 func _Watcher_RequestVote_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ElectionRequest)
+	in := new(Candidate)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -180,7 +180,7 @@ func _Watcher_RequestVote_Handler(srv interface{}, ctx context.Context, dec func
 		FullMethod: "/pb.Watcher/RequestVote",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(WatcherServer).RequestVote(ctx, req.(*ElectionRequest))
+		return srv.(WatcherServer).RequestVote(ctx, req.(*Candidate))
 	}
 	return interceptor(ctx, in, info, handler)
 }

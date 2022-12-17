@@ -1,54 +1,52 @@
 syntax = "proto3";
 
-import  "google/protobuf/timestamp.proto";
-import  "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
 
 package pb;
 
 option go_package = "github.com/haa-criticals/watcher/app/grpc/pb";
 
 message RegisterRequest {
-    string address = 1;
-    string key = 2;
+  string address = 1;
+  string key = 2;
 }
 
 message Node {
-    string address = 1;
+  string address = 1;
 }
 
 message RegisterResponse {
-    bool success = 1;
-    repeated Node nodes = 2;
+  bool success = 1;
+  repeated Node nodes = 2;
 }
 
 message Beat {
-    google.protobuf.Timestamp timestamp = 1;
-    string address = 2;
-    int64 term = 3;
+  google.protobuf.Timestamp timestamp = 1;
+  string address = 2;
+  int64 term = 3;
 }
 
 message AckRequest {
-    string key = 1;
-    Node node = 2;
+  string key = 1;
+  Node node = 2;
 }
 
-message ElectionRequest {
-    Node Requester = 1;
-    int64 term = 2;
-    int32 priority = 3;
-    google.protobuf.Timestamp lastBeat = 4;
-    google.protobuf.Timestamp startedAt = 5;
+message Candidate {
+  Node Requester = 1;
+  int64 term = 2;
+  int32 priority = 3;
 }
 
-message ElectionResponse {
-    Node node = 1;
-    int64 term = 2;
-    bool voteGranted = 3;
+message Vote {
+  Node node = 1;
+  int64 term = 2;
+  bool granted = 3;
 }
 
 service Watcher {
-    rpc Register(RegisterRequest) returns (RegisterResponse) {}
-    rpc AckNode(AckRequest) returns (Node) {}
-    rpc Heartbeat(Beat) returns (google.protobuf.Empty) {}
-    rpc RequestVote(ElectionRequest) returns (ElectionResponse) {}
+  rpc Register(RegisterRequest) returns (RegisterResponse) {}
+  rpc AckNode(AckRequest) returns (Node) {}
+  rpc Heartbeat(Beat) returns (google.protobuf.Empty) {}
+  rpc RequestVote(Candidate) returns (Vote) {}
 }
