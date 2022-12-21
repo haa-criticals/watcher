@@ -45,6 +45,10 @@ func New(w *watcher.Watcher, monitor *monitor.Monitor, provisioner *provisioner.
 		app.isLeader = true
 		monitor.StartHeartBeating()
 		monitor.StartHealthChecks()
+		err := provisioner.Create(context.Background())
+		if err != nil {
+			log.Println("failed to create resources", err)
+		}
 	}
 	return app
 }
