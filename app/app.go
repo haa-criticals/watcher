@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -86,7 +85,18 @@ func (a *App) Heartbeat(_ context.Context, in *pb.Beat) (*emptypb.Empty, error) 
 }
 
 func (a *App) RequestVote(ctx context.Context, request *pb.Candidate) (*pb.Vote, error) {
-	return nil, errors.New("not implemented")
+	vote := a.watcher.OnReceiveVoteRequest(&watcher.Candidate{
+		Term:     request.Term,
+		Address:  request.Requester.Address,
+		Priority: request.Priority,
+	})
+	return &pb.Vote{
+		Node: &pb.Node{
+			Address: a.watcher.Address,
+		},
+		Term:    vote.Term,
+		Granted: vote.Granted,
+	}, nil
 }
 
 func (a *App) Start() error {

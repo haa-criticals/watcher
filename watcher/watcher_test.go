@@ -11,7 +11,7 @@ import (
 type mockWatcherClient struct {
 	fRequestRegister func(ctx context.Context, address, key string) (*RegisterResponse, error)
 	fAckNode         func(ctx context.Context, address, key string, node *NodeInfo) (*NodeInfo, error)
-	fRequestVote     func(ctx context.Context, address, candidate string, term int64) (*Vote, error)
+	fRequestVote     func(ctx context.Context, address, candidate string, term int64, priority int32) (*Vote, error)
 }
 
 func (m *mockWatcherClient) RequestRegister(ctx context.Context, address, key string) (*RegisterResponse, error) {
@@ -22,8 +22,8 @@ func (m *mockWatcherClient) AckNode(ctx context.Context, address, key string, no
 	return m.fAckNode(ctx, address, key, node)
 }
 
-func (m *mockWatcherClient) RequestVote(ctx context.Context, address, candidate string, term int64) (*Vote, error) {
-	return m.fRequestVote(ctx, address, candidate, term)
+func (m *mockWatcherClient) RequestVote(ctx context.Context, address, candidate string, term int64, priority int32) (*Vote, error) {
+	return m.fRequestVote(ctx, address, candidate, term, priority)
 }
 
 func TestWatcher(t *testing.T) {
@@ -153,7 +153,7 @@ func TestWatcher(t *testing.T) {
 	t.Run("Should create an election if leader is down", func(t *testing.T) {
 		w := &Watcher{
 			client: &mockWatcherClient{
-				fRequestVote: func(ctx context.Context, address, candidate string, term int64) (*Vote, error) {
+				fRequestVote: func(ctx context.Context, address, candidate string, term int64, priority int32) (*Vote, error) {
 					return &Vote{
 						Granted: true,
 					}, nil
@@ -181,7 +181,7 @@ func TestWatcher(t *testing.T) {
 	t.Run("Should start an election if leader is down", func(t *testing.T) {
 		w := &Watcher{
 			client: &mockWatcherClient{
-				fRequestVote: func(ctx context.Context, address, candidate string, term int64) (*Vote, error) {
+				fRequestVote: func(ctx context.Context, address, candidate string, term int64, priority int32) (*Vote, error) {
 					return &Vote{
 						Granted: true,
 					}, nil
@@ -210,7 +210,7 @@ func TestWatcher(t *testing.T) {
 	t.Run("Election should start with random delay", func(t *testing.T) {
 		w := &Watcher{
 			client: &mockWatcherClient{
-				fRequestVote: func(ctx context.Context, address, candidate string, term int64) (*Vote, error) {
+				fRequestVote: func(ctx context.Context, address, candidate string, term int64, priority int32) (*Vote, error) {
 					return &Vote{
 						Granted: true,
 					}, nil
@@ -242,7 +242,7 @@ func TestWatcher(t *testing.T) {
 	t.Run("Should increment the term when start an election", func(t *testing.T) {
 		w := &Watcher{
 			client: &mockWatcherClient{
-				fRequestVote: func(ctx context.Context, address, candidate string, term int64) (*Vote, error) {
+				fRequestVote: func(ctx context.Context, address, candidate string, term int64, priority int32) (*Vote, error) {
 					return &Vote{
 						Granted: true,
 					}, nil
@@ -263,7 +263,7 @@ func TestWatcher(t *testing.T) {
 	t.Run("Should vote for itself when start an election", func(t *testing.T) {
 		w := &Watcher{
 			client: &mockWatcherClient{
-				fRequestVote: func(ctx context.Context, address, candidate string, term int64) (*Vote, error) {
+				fRequestVote: func(ctx context.Context, address, candidate string, term int64, priority int32) (*Vote, error) {
 					return &Vote{
 						Granted: true,
 					}, nil
@@ -280,6 +280,29 @@ func TestWatcher(t *testing.T) {
 		w.startElection()
 		time.Sleep(2 * time.Millisecond)
 		assert.Equal(t, w.Address, w.votedFor)
+	})
+
+	t.Run("Should call request vote if leader is down", func(t *testing.T) {
+
+		requestedVote := false
+		w := &Watcher{
+			client: &mockWatcherClient{
+				fRequestVote: func(ctx context.Context, address, candidate string, term int64, priority int32) (*Vote, error) {
+					requestedVote = true
+					return &Vote{
+						Granted: true,
+					}, nil
+				},
+			},
+			config: Config{MaxDelayForElection: 1},
+			nodes:  []*NodeInfo{{"node1"}},
+		}
+
+		w.startElection()
+		time.Sleep(5 * time.Millisecond)
+		assert.NotNil(t, w.election)
+		assert.True(t, requestedVote)
+
 	})
 
 	t.Run("Should deny vote if term is lower than current term", func(t *testing.T) {

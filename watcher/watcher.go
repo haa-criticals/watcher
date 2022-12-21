@@ -52,6 +52,7 @@ type Watcher struct {
 	term                           int64
 	votedFor                       string
 	config                         Config
+	OnElectionWon                  func()
 }
 
 func New(client Client, config Config) *Watcher {
@@ -213,24 +214,29 @@ func (w *Watcher) requestVotes() {
 }
 
 func (w *Watcher) requestVote(node *NodeInfo) {
-	w.client.RequestVote(context.Background(), node.Address, w.Address, w.term)
+	vote, err := w.client.RequestVote(context.Background(), node.Address, w.Address, w.term, w.config.Priority)
+	if err != nil || !vote.Granted {
+		w.election.onNonGrantedVote()
+	} else {
+		w.election.onGrantedVote()
+	}
+
+	switch w.election.currentState() {
+	case elected:
+		w.onElected()
+	case rejected:
+	}
+}
+
+func (w *Watcher) onElected() {
+	w.StopHeartBeatChecking()
+	if w.OnElectionWon != nil {
+		w.OnElectionWon()
+	}
 }
 
 func (w *Watcher) LastReceivedBeat() time.Time {
 	return w.lastReceivedBeat
-}
-
-func (w *Watcher) OnNewLeader(leader *NodeInfo) {
-	for i := range w.nodes {
-		if w.nodes[i].Address == leader.Address {
-			w.nodes[i] = w.leader
-			break
-		}
-	}
-	w.leader = leader
-	if w.leader.Address == w.Address {
-		w.StartHeartBeatChecking()
-	}
 }
 
 func (w *Watcher) OnReceiveVoteRequest(request *Candidate) *Vote {
