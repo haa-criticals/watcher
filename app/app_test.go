@@ -255,4 +255,85 @@ func TestApp(t *testing.T) {
 		node1.Stop()
 		node2.Stop()
 	})
+
+	t.Run("A node with higher priority should be elected as leader", func(t *testing.T) {
+		provider := &mockProvider{
+			fCreate: func(ctx context.Context) error {
+				return nil
+			},
+		}
+
+		config := watcher.Config{
+			MaxDelayForElection:            500,
+			LeaderDownNotificationInterval: 10 * time.Millisecond,
+			LeaderAliveInterval:            15 * time.Millisecond,
+			HeartBeatCheckInterval:         5 * time.Millisecond,
+		}
+
+		leader := New(
+			watcher.New(igrpc.NewWatchClient("localhost:50051"), config),
+			monitor.New(monitor.WithHeartBeat(igrpc.NewNotifier(), 5*time.Millisecond)),
+			provisioner.WithProvider(provider),
+			&Config{Port: 50051, Address: "localhost:50051"},
+		)
+		go func() {
+			err := leader.Start()
+			if err != nil {
+				t.Errorf("failed to start server: %v", err)
+			}
+		}()
+
+		node1 := New(
+			watcher.New(igrpc.NewWatchClient("localhost:50052"), watcher.Config{
+				MaxDelayForElection:            500,
+				LeaderDownNotificationInterval: 10 * time.Millisecond,
+				LeaderAliveInterval:            15 * time.Millisecond,
+				HeartBeatCheckInterval:         5 * time.Millisecond,
+				Priority:                       10,
+			}),
+			monitor.New(),
+			provisioner.WithProvider(provider),
+			&Config{Port: 50052, Leader: "localhost:50051", Address: "localhost:50052"},
+		)
+
+		node1.watcher.OnElectionWon = func() {
+			node1.isLeader = true
+		}
+
+		go func() {
+			err := node1.Start()
+			if err != nil {
+				t.Errorf("failed to start node: %v", err)
+			}
+		}()
+
+		node2 := New(
+			watcher.New(igrpc.NewWatchClient("localhost:50053"), config),
+			monitor.New(),
+			provisioner.WithProvider(provider),
+			&Config{Port: 50053, Leader: "localhost:50051", Address: "localhost:50053"},
+		)
+
+		node2.watcher.OnElectionWon = func() {
+			node2.isLeader = true
+		}
+
+		go func() {
+			err := node2.Start()
+			if err != nil {
+				t.Errorf("failed to start node: %v", err)
+			}
+		}()
+
+		time.Sleep(10 * time.Millisecond)
+		assert.True(t, leader.isLeader)
+		assert.False(t, node1.isLeader)
+		assert.False(t, node2.isLeader)
+		leader.Stop()
+		time.Sleep(600 * time.Millisecond)
+		assert.True(t, node1.isLeader)
+		assert.False(t, node2.isLeader)
+		node1.Stop()
+		node2.Stop()
+	})
 }
