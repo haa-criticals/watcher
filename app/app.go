@@ -33,13 +33,20 @@ type App struct {
 
 func New(w *watcher.Watcher, monitor *monitor.Monitor, provisioner *provisioner.Manager, config *Config) *App {
 	w.Address = config.Address
-	return &App{
+	app := &App{
 		watcher:     w,
 		monitor:     monitor,
 		provisioner: provisioner,
 		config:      config,
 		isLeader:    config.Leader == "",
 	}
+
+	w.OnElectionWon = func() {
+		app.isLeader = true
+		monitor.StartHeartBeating()
+		monitor.StartHealthChecks()
+	}
+	return app
 }
 
 func (a *App) Register(_ context.Context, in *pb.RegisterRequest) (*pb.RegisterResponse, error) {
