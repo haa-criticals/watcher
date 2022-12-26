@@ -37,9 +37,6 @@ type Monitor struct {
 
 func (m *Monitor) RegisterWatcher(watcher *watcher.NodeInfo) {
 	m.watchers = append(m.watchers, watcher)
-	if !m.isHeartBeating {
-		go m.StartHeartBeating()
-	}
 }
 
 func (m *Monitor) StartHeartBeating() {
@@ -56,6 +53,7 @@ func (m *Monitor) StartHeartBeating() {
 	for {
 		select {
 		case <-t.C:
+
 			err := m.heartBeat()
 			if err != nil {
 				log.Printf("error sending heart Beat: %v", err)

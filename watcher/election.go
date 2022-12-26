@@ -11,6 +11,7 @@ const (
 	inProgress electionState = iota
 	elected
 	rejected
+	finished
 )
 
 type election struct {
@@ -18,6 +19,7 @@ type election struct {
 	startedAt time.Time
 	rejected  int
 	granted   int
+	finished  bool
 }
 
 func (e *election) onNonGrantedVote() {
@@ -34,7 +36,9 @@ func (e *election) isCompleted() bool {
 
 func (e *election) currentState() electionState {
 	state := inProgress
-	if e.granted > len(e.nodes)/2 {
+	if e.finished {
+		state = finished
+	} else if e.granted > len(e.nodes)/2 {
 		state = elected
 	} else if e.rejected > len(e.nodes)/2 {
 		state = rejected

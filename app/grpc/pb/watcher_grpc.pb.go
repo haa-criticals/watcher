@@ -23,8 +23,6 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type WatcherClient interface {
-	Register(ctx context.Context, in *RegisterRequest, opts ...grpc.CallOption) (*RegisterResponse, error)
-	AckNode(ctx context.Context, in *AckRequest, opts ...grpc.CallOption) (*Node, error)
 	Heartbeat(ctx context.Context, in *Beat, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	RequestVote(ctx context.Context, in *Candidate, opts ...grpc.CallOption) (*Vote, error)
 }
@@ -35,24 +33,6 @@ type watcherClient struct {
 
 func NewWatcherClient(cc grpc.ClientConnInterface) WatcherClient {
 	return &watcherClient{cc}
-}
-
-func (c *watcherClient) Register(ctx context.Context, in *RegisterRequest, opts ...grpc.CallOption) (*RegisterResponse, error) {
-	out := new(RegisterResponse)
-	err := c.cc.Invoke(ctx, "/pb.Watcher/Register", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *watcherClient) AckNode(ctx context.Context, in *AckRequest, opts ...grpc.CallOption) (*Node, error) {
-	out := new(Node)
-	err := c.cc.Invoke(ctx, "/pb.Watcher/AckNode", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
 }
 
 func (c *watcherClient) Heartbeat(ctx context.Context, in *Beat, opts ...grpc.CallOption) (*emptypb.Empty, error) {
@@ -77,8 +57,6 @@ func (c *watcherClient) RequestVote(ctx context.Context, in *Candidate, opts ...
 // All implementations must embed UnimplementedWatcherServer
 // for forward compatibility
 type WatcherServer interface {
-	Register(context.Context, *RegisterRequest) (*RegisterResponse, error)
-	AckNode(context.Context, *AckRequest) (*Node, error)
 	Heartbeat(context.Context, *Beat) (*emptypb.Empty, error)
 	RequestVote(context.Context, *Candidate) (*Vote, error)
 	mustEmbedUnimplementedWatcherServer()
@@ -88,12 +66,6 @@ type WatcherServer interface {
 type UnimplementedWatcherServer struct {
 }
 
-func (UnimplementedWatcherServer) Register(context.Context, *RegisterRequest) (*RegisterResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Register not implemented")
-}
-func (UnimplementedWatcherServer) AckNode(context.Context, *AckRequest) (*Node, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method AckNode not implemented")
-}
 func (UnimplementedWatcherServer) Heartbeat(context.Context, *Beat) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Heartbeat not implemented")
 }
@@ -111,42 +83,6 @@ type UnsafeWatcherServer interface {
 
 func RegisterWatcherServer(s grpc.ServiceRegistrar, srv WatcherServer) {
 	s.RegisterService(&Watcher_ServiceDesc, srv)
-}
-
-func _Watcher_Register_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RegisterRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(WatcherServer).Register(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/pb.Watcher/Register",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(WatcherServer).Register(ctx, req.(*RegisterRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Watcher_AckNode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(AckRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(WatcherServer).AckNode(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/pb.Watcher/AckNode",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(WatcherServer).AckNode(ctx, req.(*AckRequest))
-	}
-	return interceptor(ctx, in, info, handler)
 }
 
 func _Watcher_Heartbeat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -192,14 +128,6 @@ var Watcher_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "pb.Watcher",
 	HandlerType: (*WatcherServer)(nil),
 	Methods: []grpc.MethodDesc{
-		{
-			MethodName: "Register",
-			Handler:    _Watcher_Register_Handler,
-		},
-		{
-			MethodName: "AckNode",
-			Handler:    _Watcher_AckNode_Handler,
-		},
 		{
 			MethodName: "Heartbeat",
 			Handler:    _Watcher_Heartbeat_Handler,

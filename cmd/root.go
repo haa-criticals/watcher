@@ -17,14 +17,10 @@ import (
 )
 
 var (
-	cfgFile  string
-	port     int
-	leader   string
-	address  string
-	priority int32
-
+	cfgFile    string
+	address    string
+	peers      []string
 	watch      bool
-	provider   string
 	baseUrl    string
 	token      string
 	projectId  int64
@@ -68,8 +64,6 @@ to quickly create a Cobra application.`,
 		)
 
 		a := app.New(w, m, provisioner.WithProvider(&providerConsole{}), &app.Config{
-			Port:    port,
-			Leader:  leader,
 			Address: address,
 		})
 		if err := a.Start(); err != nil {
@@ -91,16 +85,13 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "c", "config file (default is $HOME/.watcher.yaml)")
-	rootCmd.PersistentFlags().StringVar(&provider, "provider", "gitlab", "The provisioner  provider to use, available options are: gitlab")
 	rootCmd.PersistentFlags().StringVarP(&baseUrl, "base-url", "b", "", "The base url of the provisioner's provider")
 	rootCmd.PersistentFlags().StringVarP(&token, "token", "t", "", "The token to use to authenticate with the provisioner's provider")
 	rootCmd.PersistentFlags().Int64VarP(&projectId, "project-id", "i", 0, "The project id to use to authenticate with the provisioner's provider")
 	rootCmd.PersistentFlags().StringVarP(&projectRef, "project-ref", "r", "main", "The project ref to use with the provisioner's provider")
 	rootCmd.PersistentFlags().StringToStringVarP(&variables, "variables", "v", nil, "The variables to use with the provisioner's provider")
-	rootCmd.Flags().IntVarP(&port, "port", "p", 8080, "The port to use to serve")
-	rootCmd.Flags().StringVarP(&leader, "leader", "l", "", "The endpoint to use to connect to the leader")
-	rootCmd.Flags().StringVarP(&address, "address", "a", "localhost:8080", "The url to use to connect to this watcher")
-	rootCmd.Flags().Int32VarP(&priority, "priority", "P", 0, "The priority to be elected as leader")
+	rootCmd.Flags().StringVarP(&address, "address", "a", ":8080", "The bind address this watcher")
+	rootCmd.Flags().StringSliceVarP(&peers, "peers", "p", nil, "The peers to connect to")
 	_ = rootCmd.MarkFlagRequired("base-url")
 	_ = rootCmd.MarkFlagRequired("token")
 	_ = rootCmd.MarkFlagRequired("project-id")

@@ -4,19 +4,14 @@ import (
 	"context"
 	"fmt"
 	"github.com.haa-criticals/watcher/provisioner"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-
 	"github.com/stretchr/testify/assert"
 
 	igrpc "github.com.haa-criticals/watcher/app/grpc"
-	"github.com.haa-criticals/watcher/app/grpc/pb"
 	"github.com.haa-criticals/watcher/monitor"
 	"github.com.haa-criticals/watcher/watcher"
 )
@@ -34,82 +29,44 @@ func (m *mockProvider) Destroy(ctx context.Context) error {
 	return m.fDestroy(ctx)
 }
 
-func TestRegisterWatcher(t *testing.T) {
-	t.Run("should register watcher", func(t *testing.T) {
-		config := &Config{
-			Port: 50051,
+var (
+	defaultWc = watcher.Config{
+		MaxDelayForElection:    50,
+		HeartBeatCheckInterval: 15 * time.Millisecond,
+	}
+)
+
+func startNewNode(t *testing.T, address string, config *Config, provider provisioner.Provider, wc watcher.Config, monitorOpts ...monitor.Option) *App {
+	t.Helper()
+	node := New(
+		watcher.New(igrpc.NewWatchClient(address), wc),
+		monitor.New(monitorOpts...),
+		provisioner.WithProvider(provider),
+		config,
+	)
+
+	go func() {
+		err := node.Start()
+		if err != nil {
+			t.Errorf("failed to start node %s:  %v", address, err)
 		}
+	}()
+	return node
+}
 
-		p := provisioner.WithProvider(&mockProvider{
-			fCreate: func(ctx context.Context) error {
-				return nil
-			},
-		})
-
-		w := watcher.New(igrpc.NewWatchClient("localhost:50051"), watcher.Config{})
-
-		server := New(w, monitor.New(), p, config)
-		go func() {
-			err := server.Start()
-			if err != nil {
-				t.Errorf("failed to start server: %v", err)
-			}
-		}()
-
-		conn, err := grpc.Dial("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
-		assert.NoError(t, err)
-		client := pb.NewWatcherClient(conn)
-
-		r, err := client.Register(context.Background(), &pb.RegisterRequest{Address: "localhost:50052"})
-		assert.NoError(t, err)
-		assert.NotNil(t, r)
-		assert.True(t, r.Success)
-		server.Stop()
-	})
-
-	t.Run("Should receive heartbeat after registering", func(t *testing.T) {
-		config := &Config{
-			Port: 50051,
-		}
-		p := provisioner.WithProvider(&mockProvider{fCreate: func(ctx context.Context) error {
-			return nil
-		}})
-
-		leader := New(
-			watcher.New(igrpc.NewWatchClient("localhost:50051"), watcher.Config{}),
-			monitor.New(monitor.WithHeartBeat(igrpc.NewNotifier(), 3*time.Millisecond)),
-			p,
-			config)
-		go func() {
-			err := leader.Start()
-			if err != nil {
-				t.Errorf("failed to start server: %v", err)
-			}
-		}()
-
-		ref := time.Now()
-		w := watcher.New(igrpc.NewWatchClient("localhost:50052"), watcher.Config{})
-		node := New(w, monitor.New(), nil, &Config{Port: 50052, Leader: "localhost:50051", Address: "localhost:50052"})
-		go func() {
-			err := node.Start()
-			if err != nil {
-				t.Errorf("failed to start node: %v", err)
-			}
-		}()
-		go w.StartHeartBeatChecking()
-		time.Sleep(9 * time.Millisecond)
-		assert.True(t, w.LastReceivedBeat().After(ref))
-		w.StopHeartBeatChecking()
-		leader.Stop()
-		node.Stop()
-	})
+func discoverLeader(t *testing.T, nodes ...*App) (*App, *App, *App) {
+	t.Helper()
+	if nodes[0].isLeader {
+		return nodes[0], nodes[1], nodes[2]
+	}
+	if nodes[1].isLeader {
+		return nodes[1], nodes[0], nodes[2]
+	}
+	return nodes[2], nodes[0], nodes[1]
 }
 
 func TestAppStart(t *testing.T) {
-	t.Run("Should call the provisioner create when the app starts as leader", func(t *testing.T) {
-		config := &Config{
-			Port: 50051,
-		}
+	t.Run("Should call the provisioner create when the app starts", func(t *testing.T) {
 
 		createCalled := false
 		provider := &mockProvider{
@@ -119,30 +76,32 @@ func TestAppStart(t *testing.T) {
 			},
 		}
 
-		server := New(
-			watcher.New(igrpc.NewWatchClient("localhost:50051"), watcher.Config{}),
-			monitor.New(),
-			provisioner.WithProvider(provider),
-			config,
-		)
-		go func() {
-			err := server.Start()
-			if err != nil {
-				t.Errorf("failed to start server: %v", err)
-			}
-		}()
+		monitorHB := monitor.WithHeartBeat(igrpc.NewNotifier(), 1*time.Millisecond)
 
-		time.Sleep(2 * time.Second)
+		node1 := startNewNode(t, ":50051", &Config{
+			Address: ":50051",
+			Peers:   []string{":50052", ":50053"},
+		}, provider, defaultWc, monitorHB)
+
+		node2 := startNewNode(t, ":50052", &Config{
+			Address: ":50052",
+			Peers:   []string{":50051", ":50053"},
+		}, provider, defaultWc, monitorHB)
+
+		node3 := startNewNode(t, ":50053", &Config{
+			Address: ":50053",
+			Peers:   []string{":50051", ":50052"},
+		}, provider, defaultWc, monitorHB)
+
+		time.Sleep(100 * time.Millisecond)
 		assert.True(t, createCalled)
-		server.Stop()
+		node1.Stop()
+		node2.Stop()
+		node3.Stop()
 
 	})
 
-	t.Run("Should start health check when the app starts as leader", func(t *testing.T) {
-		config := &Config{
-			Port: 50051,
-		}
-
+	t.Run("Should start health check when the app starts", func(t *testing.T) {
 		healthCalled := false
 		mux := http.NewServeMux()
 		mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -154,29 +113,35 @@ func TestAppStart(t *testing.T) {
 		provider := &mockProvider{
 			fCreate: func(ctx context.Context) error {
 				server.Start()
-				log.Println("server started")
 				return nil
 			},
 		}
 
-		app := New(
-			watcher.New(igrpc.NewWatchClient("localhost:50051"), watcher.Config{}),
-			monitor.New(monitor.WithHealthCheck(fmt.Sprintf("http://%s%s", server.Listener.Addr(), "/health"), 5*time.Millisecond, 3)),
-			provisioner.WithProvider(provider),
-			config,
-		)
-		go func() {
-			err := app.Start()
-			if err != nil {
-				t.Errorf("failed to start server: %v", err)
-			}
-		}()
+		monitorHB := monitor.WithHeartBeat(igrpc.NewNotifier(), 5*time.Millisecond)
+		monitorHC := monitor.WithHealthCheck(fmt.Sprintf("http://%s%s", server.Listener.Addr(), "/health"), 1*time.Millisecond, 3)
 
-		time.Sleep(10 * time.Millisecond)
+		node1 := startNewNode(t, ":50051", &Config{
+			Address: ":50051",
+			Peers:   []string{":50052", ":50053"},
+		}, provider, defaultWc, monitorHC, monitorHB)
+
+		node2 := startNewNode(t, ":50052", &Config{
+			Address: ":50052",
+			Peers:   []string{":50051", ":50053"},
+		}, provider, defaultWc, monitorHC, monitorHB)
+
+		node3 := startNewNode(t, ":50053", &Config{
+			Address: ":50053",
+			Peers:   []string{":50051", ":50052"},
+		}, provider, defaultWc, monitorHC, monitorHB)
+
+		time.Sleep(100 * time.Millisecond)
 		assert.True(t, healthCalled)
-		assert.True(t, app.monitor.IsHealthy())
+		assert.True(t, node1.monitor.IsHealthy() || node2.monitor.IsHealthy() || node3.monitor.IsHealthy())
+		node1.Stop()
+		node2.Stop()
+		node3.Stop()
 		server.Close()
-		app.Stop()
 	})
 }
 
@@ -189,152 +154,38 @@ func TestApp(t *testing.T) {
 			},
 		}
 
-		config := watcher.Config{
-			MaxDelayForElection:            500,
-			LeaderDownNotificationInterval: 10 * time.Millisecond,
-			LeaderAliveInterval:            15 * time.Millisecond,
-			HeartBeatCheckInterval:         5 * time.Millisecond,
-		}
+		monitorHB := monitor.WithHeartBeat(igrpc.NewNotifier(), 5*time.Millisecond)
 
-		leader := New(
-			watcher.New(igrpc.NewWatchClient("localhost:50051"), config),
-			monitor.New(monitor.WithHeartBeat(igrpc.NewNotifier(), 5*time.Millisecond)),
-			provisioner.WithProvider(provider),
-			&Config{Port: 50051, Address: "localhost:50051"},
-		)
-		go func() {
-			err := leader.Start()
-			if err != nil {
-				t.Errorf("failed to start server: %v", err)
-			}
-		}()
+		node1 := startNewNode(t, ":50051", &Config{
+			Address: ":50051",
+			Peers:   []string{":50052", ":50053"},
+		}, provider, watcher.Config{
+			MaxDelayForElection:    50,
+			HeartBeatCheckInterval: 15 * time.Millisecond,
+		}, monitorHB)
 
-		node1 := New(
-			watcher.New(igrpc.NewWatchClient("localhost:50052"), config),
-			monitor.New(),
-			provisioner.WithProvider(provider),
-			&Config{Port: 50052, Leader: "localhost:50051", Address: "localhost:50052"},
-		)
+		node2 := startNewNode(t, ":50052", &Config{
+			Address: ":50052",
+			Peers:   []string{":50051", ":50053"},
+		}, provider, defaultWc, monitorHB)
 
-		node1.watcher.OnElectionWon = func() {
-			node1.isLeader = true
-		}
+		node3 := startNewNode(t, ":50053", &Config{
+			Address: ":50053",
+			Peers:   []string{":50051", ":50052"},
+		}, provider, defaultWc, monitorHB)
 
-		go func() {
-			err := node1.Start()
-			if err != nil {
-				t.Errorf("failed to start node: %v", err)
-			}
-		}()
+		time.Sleep(200 * time.Millisecond)
 
-		node2 := New(
-			watcher.New(igrpc.NewWatchClient("localhost:50053"), config),
-			monitor.New(),
-			provisioner.WithProvider(provider),
-			&Config{Port: 50053, Leader: "localhost:50051", Address: "localhost:50053"},
-		)
+		leader, n1, n2 := discoverLeader(t, node1, node2, node3)
 
-		node2.watcher.OnElectionWon = func() {
-			node2.isLeader = true
-		}
-
-		go func() {
-			err := node2.Start()
-			if err != nil {
-				t.Errorf("failed to start node: %v", err)
-			}
-		}()
-
-		time.Sleep(10 * time.Millisecond)
 		assert.True(t, leader.isLeader)
-		assert.False(t, node1.isLeader)
-		assert.False(t, node2.isLeader)
+		assert.False(t, n1.isLeader)
+		assert.False(t, n2.isLeader)
 		leader.Stop()
-		time.Sleep(600 * time.Millisecond)
-		assert.True(t, node1.isLeader || node2.isLeader)
-		node1.Stop()
-		node2.Stop()
-	})
-
-	t.Run("A node with higher priority should be elected as leader", func(t *testing.T) {
-		provider := &mockProvider{
-			fCreate: func(ctx context.Context) error {
-				return nil
-			},
-		}
-
-		config := watcher.Config{
-			MaxDelayForElection:            500,
-			LeaderDownNotificationInterval: 10 * time.Millisecond,
-			LeaderAliveInterval:            15 * time.Millisecond,
-			HeartBeatCheckInterval:         5 * time.Millisecond,
-		}
-
-		leader := New(
-			watcher.New(igrpc.NewWatchClient("localhost:50051"), config),
-			monitor.New(monitor.WithHeartBeat(igrpc.NewNotifier(), 5*time.Millisecond)),
-			provisioner.WithProvider(provider),
-			&Config{Port: 50051, Address: "localhost:50051"},
-		)
-		go func() {
-			err := leader.Start()
-			if err != nil {
-				t.Errorf("failed to start server: %v", err)
-			}
-		}()
-
-		node1 := New(
-			watcher.New(igrpc.NewWatchClient("localhost:50052"), watcher.Config{
-				MaxDelayForElection:            500,
-				LeaderDownNotificationInterval: 10 * time.Millisecond,
-				LeaderAliveInterval:            15 * time.Millisecond,
-				HeartBeatCheckInterval:         5 * time.Millisecond,
-				Priority:                       10,
-			}),
-			monitor.New(),
-			provisioner.WithProvider(provider),
-			&Config{Port: 50052, Leader: "localhost:50051", Address: "localhost:50052"},
-		)
-
-		node1.watcher.OnElectionWon = func() {
-			node1.isLeader = true
-		}
-
-		go func() {
-			err := node1.Start()
-			if err != nil {
-				t.Errorf("failed to start node: %v", err)
-			}
-		}()
-
-		node2 := New(
-			watcher.New(igrpc.NewWatchClient("localhost:50053"), config),
-			monitor.New(),
-			provisioner.WithProvider(provider),
-			&Config{Port: 50053, Leader: "localhost:50051", Address: "localhost:50053"},
-		)
-
-		node2.watcher.OnElectionWon = func() {
-			node2.isLeader = true
-		}
-
-		go func() {
-			err := node2.Start()
-			if err != nil {
-				t.Errorf("failed to start node: %v", err)
-			}
-		}()
-
-		time.Sleep(10 * time.Millisecond)
-		assert.True(t, leader.isLeader)
-		assert.False(t, node1.isLeader)
-		assert.False(t, node2.isLeader)
-		leader.Stop()
-		time.Sleep(600 * time.Millisecond)
-		assert.True(t, node1.isLeader)
-		assert.False(t, node2.isLeader)
-		node1.Stop()
-		node2.Stop()
+		time.Sleep(500 * time.Millisecond)
+		assert.True(t, n1.isLeader || n2.isLeader)
+		n1.Stop()
+		n2.Stop()
 	})
 
 	t.Run("A elected node should start to monitor", func(t *testing.T) {
@@ -344,64 +195,38 @@ func TestApp(t *testing.T) {
 			},
 		}
 
-		config := watcher.Config{
-			MaxDelayForElection:            500,
-			LeaderDownNotificationInterval: 10 * time.Millisecond,
-			LeaderAliveInterval:            15 * time.Millisecond,
-			HeartBeatCheckInterval:         5 * time.Millisecond,
-		}
+		monitorHB := monitor.WithHeartBeat(igrpc.NewNotifier(), 5*time.Millisecond)
 
-		leader := New(
-			watcher.New(igrpc.NewWatchClient("localhost:50051"), config),
-			monitor.New(monitor.WithHeartBeat(igrpc.NewNotifier(), 5*time.Millisecond)),
-			provisioner.WithProvider(provider),
-			&Config{Port: 50051, Address: "localhost:50051"},
-		)
-		go func() {
-			err := leader.Start()
-			if err != nil {
-				t.Errorf("failed to start server: %v", err)
-			}
-		}()
+		node1 := startNewNode(t, ":50051", &Config{
+			Address: ":50051",
+			Peers:   []string{":50052", ":50053"},
+		}, provider, watcher.Config{
+			MaxDelayForElection:    50,
+			HeartBeatCheckInterval: 15 * time.Millisecond,
+		}, monitorHB)
 
-		node1 := New(
-			watcher.New(igrpc.NewWatchClient("localhost:50052"), config),
-			monitor.New(),
-			provisioner.WithProvider(provider),
-			&Config{Port: 50052, Leader: "localhost:50051", Address: "localhost:50052"},
-		)
+		node2 := startNewNode(t, ":50052", &Config{
+			Address: ":50052",
+			Peers:   []string{":50051", ":50053"},
+		}, provider, defaultWc, monitorHB)
 
-		go func() {
-			err := node1.Start()
-			if err != nil {
-				t.Errorf("failed to start node: %v", err)
-			}
-		}()
+		node3 := startNewNode(t, ":50053", &Config{
+			Address: ":50053",
+			Peers:   []string{":50051", ":50052"},
+		}, provider, defaultWc, monitorHB)
 
-		node2 := New(
-			watcher.New(igrpc.NewWatchClient("localhost:50053"), config),
-			monitor.New(),
-			provisioner.WithProvider(provider),
-			&Config{Port: 50053, Leader: "localhost:50051", Address: "localhost:50053"},
-		)
+		time.Sleep(200 * time.Millisecond)
 
-		go func() {
-			err := node2.Start()
-			if err != nil {
-				t.Errorf("failed to start node: %v", err)
-			}
-		}()
-
-		time.Sleep(10 * time.Millisecond)
+		leader, n1, n2 := discoverLeader(t, node1, node2, node3)
 		assert.True(t, leader.isLeader)
-		assert.False(t, node1.isLeader)
-		assert.False(t, node2.isLeader)
+		assert.False(t, n1.isLeader)
+		assert.False(t, n2.isLeader)
 		leader.Stop()
-		time.Sleep(600 * time.Millisecond)
-		assert.True(t, node1.isLeader || node2.isLeader)
-		assert.True(t, node1.monitor.IsMonitoring() || node2.monitor.IsMonitoring())
-		node1.Stop()
-		node2.Stop()
+		time.Sleep(500 * time.Millisecond)
+		assert.True(t, n1.isLeader || n2.isLeader)
+		assert.True(t, n1.monitor.IsMonitoring() || n2.monitor.IsMonitoring())
+		n1.Stop()
+		n2.Stop()
 	})
 
 	t.Run("A elected node should call the provider to create the resource", func(t *testing.T) {
@@ -414,67 +239,38 @@ func TestApp(t *testing.T) {
 			},
 		}
 
-		config := watcher.Config{
-			MaxDelayForElection:            500,
-			LeaderDownNotificationInterval: 10 * time.Millisecond,
-			LeaderAliveInterval:            15 * time.Millisecond,
-			HeartBeatCheckInterval:         5 * time.Millisecond,
-		}
+		monitorHB := monitor.WithHeartBeat(igrpc.NewNotifier(), 5*time.Millisecond)
 
-		leader := New(
-			watcher.New(igrpc.NewWatchClient("localhost:50051"), config),
-			monitor.New(monitor.WithHeartBeat(igrpc.NewNotifier(), 5*time.Millisecond)),
-			provisioner.WithProvider(&mockProvider{
-				fCreate: func(ctx context.Context) error {
-					return nil
-				},
-			}),
-			&Config{Port: 50051, Address: "localhost:50051"},
-		)
-		go func() {
-			err := leader.Start()
-			if err != nil {
-				t.Errorf("failed to start server: %v", err)
-			}
-		}()
+		node1 := startNewNode(t, ":50051", &Config{
+			Address: ":50051",
+			Peers:   []string{":50052", ":50053"},
+		}, provider, watcher.Config{
+			MaxDelayForElection:    50,
+			HeartBeatCheckInterval: 15 * time.Millisecond,
+		}, monitorHB)
 
-		node1 := New(
-			watcher.New(igrpc.NewWatchClient("localhost:50052"), config),
-			monitor.New(),
-			provisioner.WithProvider(provider),
-			&Config{Port: 50052, Leader: "localhost:50051", Address: "localhost:50052"},
-		)
+		node2 := startNewNode(t, ":50052", &Config{
+			Address: ":50052",
+			Peers:   []string{":50051", ":50053"},
+		}, provider, defaultWc, monitorHB)
 
-		go func() {
-			err := node1.Start()
-			if err != nil {
-				t.Errorf("failed to start node: %v", err)
-			}
-		}()
+		node3 := startNewNode(t, ":50053", &Config{
+			Address: ":50053",
+			Peers:   []string{":50051", ":50052"},
+		}, provider, defaultWc, monitorHB)
 
-		node2 := New(
-			watcher.New(igrpc.NewWatchClient("localhost:50053"), config),
-			monitor.New(),
-			provisioner.WithProvider(provider),
-			&Config{Port: 50053, Leader: "localhost:50051", Address: "localhost:50053"},
-		)
+		time.Sleep(200 * time.Millisecond)
 
-		go func() {
-			err := node2.Start()
-			if err != nil {
-				t.Errorf("failed to start node: %v", err)
-			}
-		}()
+		leader, n1, n2 := discoverLeader(t, node1, node2, node3)
 
-		time.Sleep(10 * time.Millisecond)
 		assert.True(t, leader.isLeader)
-		assert.False(t, node1.isLeader)
-		assert.False(t, node2.isLeader)
+		assert.False(t, n1.isLeader)
+		assert.False(t, n2.isLeader)
 		leader.Stop()
-		time.Sleep(600 * time.Millisecond)
-		assert.True(t, node1.isLeader || node2.isLeader)
+		time.Sleep(500 * time.Millisecond)
+		assert.True(t, n1.isLeader || n2.isLeader)
 		assert.True(t, providerCalled)
-		node1.Stop()
-		node2.Stop()
+		n1.Stop()
+		n2.Stop()
 	})
 }

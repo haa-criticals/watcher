@@ -3,7 +3,6 @@ package watcher
 import (
 	"context"
 	"github.com/stretchr/testify/assert"
-	"sync"
 	"testing"
 	"time"
 )
@@ -11,7 +10,7 @@ import (
 type mockWatcherClient struct {
 	fRequestRegister func(ctx context.Context, address, key string) (*RegisterResponse, error)
 	fAckNode         func(ctx context.Context, address, key string, node *NodeInfo) (*NodeInfo, error)
-	fRequestVote     func(ctx context.Context, address, candidate string, term int64, priority int32) (*Vote, error)
+	fRequestVote     func(ctx context.Context, address, candidate string, term int64) (*Vote, error)
 }
 
 func (m *mockWatcherClient) RequestRegister(ctx context.Context, address, key string) (*RegisterResponse, error) {
@@ -22,8 +21,8 @@ func (m *mockWatcherClient) AckNode(ctx context.Context, address, key string, no
 	return m.fAckNode(ctx, address, key, node)
 }
 
-func (m *mockWatcherClient) RequestVote(ctx context.Context, address, candidate string, term int64, priority int32) (*Vote, error) {
-	return m.fRequestVote(ctx, address, candidate, term, priority)
+func (m *mockWatcherClient) RequestVote(ctx context.Context, address, candidate string, term int64) (*Vote, error) {
+	return m.fRequestVote(ctx, address, candidate, term)
 }
 
 func TestWatcher(t *testing.T) {
@@ -32,12 +31,10 @@ func TestWatcher(t *testing.T) {
 		w := &Watcher{
 			config: Config{
 				HeartBeatCheckInterval: 5 * time.Millisecond,
-				LeaderAliveInterval:    10 * time.Millisecond,
 				MaxDelayForElection:    1,
 			},
 			lastReceivedBeat: time.Now(),
-			leader:           &NodeInfo{},
-			OnLeaderDown: func(leader *NodeInfo, nodes []*NodeInfo, lastReceivedBeat time.Time) {
+			OnLeaderDown: func(nodes []*NodeInfo, lastReceivedBeat time.Time) {
 				leaderDownTriggered = true
 			},
 		}
@@ -52,10 +49,10 @@ func TestWatcher(t *testing.T) {
 		w := &Watcher{
 			config: Config{
 				HeartBeatCheckInterval: 5 * time.Millisecond,
-				LeaderAliveInterval:    10 * time.Millisecond,
+				MaxDelayForElection:    5,
 			},
 			lastReceivedBeat: time.Now(),
-			OnLeaderDown: func(leader *NodeInfo, nodes []*NodeInfo, lastReceivedBeat time.Time) {
+			OnLeaderDown: func(nodes []*NodeInfo, lastReceivedBeat time.Time) {
 				leaderDownTriggered = true
 			},
 		}
@@ -72,39 +69,19 @@ func TestWatcher(t *testing.T) {
 		leaderDownTriggeredCount := 0
 		w := &Watcher{
 			config: Config{
-				HeartBeatCheckInterval: 10 * time.Millisecond,
-				LeaderAliveInterval:    10 * time.Millisecond,
+				HeartBeatCheckInterval: 1 * time.Millisecond,
 				MaxDelayForElection:    1,
 			},
 			lastReceivedBeat: time.Now(),
-			leader:           &NodeInfo{},
-			OnLeaderDown: func(leader *NodeInfo, nodes []*NodeInfo, lastReceivedBeat time.Time) {
+			OnLeaderDown: func(nodes []*NodeInfo, lastReceivedBeat time.Time) {
 				leaderDownTriggeredCount = leaderDownTriggeredCount + 1
 			},
 		}
 
 		go w.StartHeartBeatChecking()
 		go w.StartHeartBeatChecking()
-		time.Sleep(15 * time.Millisecond)
+		time.Sleep(5 * time.Millisecond)
 		assert.Equal(t, 1, leaderDownTriggeredCount)
-	})
-
-	t.Run("Should not start checking heart beat if there is no leader", func(t *testing.T) {
-		leaderDownTriggeredCount := 0
-		w := &Watcher{
-			config: Config{
-				HeartBeatCheckInterval: 5 * time.Millisecond,
-				LeaderAliveInterval:    10 * time.Millisecond,
-			},
-			lastReceivedBeat: time.Now(),
-			OnLeaderDown: func(leader *NodeInfo, nodes []*NodeInfo, lastReceivedBeat time.Time) {
-				leaderDownTriggeredCount = leaderDownTriggeredCount + 1
-			},
-		}
-
-		go w.StartHeartBeatChecking()
-		time.Sleep(15 * time.Millisecond)
-		assert.Equal(t, 0, leaderDownTriggeredCount)
 	})
 
 	t.Run("Should not notify leader down if stopped checking heart beat", func(t *testing.T) {
@@ -112,12 +89,11 @@ func TestWatcher(t *testing.T) {
 		w := &Watcher{
 			config: Config{
 				HeartBeatCheckInterval: 10 * time.Millisecond,
-				LeaderAliveInterval:    10 * time.Millisecond,
+				MaxDelayForElection:    5,
 			},
 			lastReceivedBeat:      time.Now(),
-			leader:                &NodeInfo{},
 			doneHeartBeatChecking: make(chan struct{}),
-			OnLeaderDown: func(leader *NodeInfo, nodes []*NodeInfo, lastReceivedBeat time.Time) {
+			OnLeaderDown: func(nodes []*NodeInfo, lastReceivedBeat time.Time) {
 				leaderDownTriggered = true
 			},
 		}
@@ -133,14 +109,11 @@ func TestWatcher(t *testing.T) {
 		leaderDownTriggeredCount := 0
 		w := &Watcher{
 			config: Config{
-				HeartBeatCheckInterval:         5 * time.Millisecond,
-				LeaderAliveInterval:            10 * time.Millisecond,
-				LeaderDownNotificationInterval: 15 * time.Millisecond,
-				MaxDelayForElection:            1,
+				HeartBeatCheckInterval: 5 * time.Millisecond,
+				MaxDelayForElection:    1,
 			},
 			lastReceivedBeat: time.Now(),
-			leader:           &NodeInfo{},
-			OnLeaderDown: func(leader *NodeInfo, nodes []*NodeInfo, lastReceivedBeat time.Time) {
+			OnLeaderDown: func(nodes []*NodeInfo, lastReceivedBeat time.Time) {
 				leaderDownTriggeredCount++
 			},
 		}
@@ -153,20 +126,17 @@ func TestWatcher(t *testing.T) {
 	t.Run("Should create an election if leader is down", func(t *testing.T) {
 		w := &Watcher{
 			client: &mockWatcherClient{
-				fRequestVote: func(ctx context.Context, address, candidate string, term int64, priority int32) (*Vote, error) {
+				fRequestVote: func(ctx context.Context, address, candidate string, term int64) (*Vote, error) {
 					return &Vote{
 						Granted: true,
 					}, nil
 				},
 			},
 			config: Config{
-				HeartBeatCheckInterval:         5 * time.Millisecond,
-				LeaderAliveInterval:            10 * time.Millisecond,
-				LeaderDownNotificationInterval: 15 * time.Millisecond,
-				MaxDelayForElection:            1,
+				HeartBeatCheckInterval: 5 * time.Millisecond,
+				MaxDelayForElection:    1,
 			},
 			lastReceivedBeat: time.Now(),
-			leader:           &NodeInfo{},
 			nodes: []*NodeInfo{
 				{"node1"},
 				{"node2"},
@@ -181,20 +151,17 @@ func TestWatcher(t *testing.T) {
 	t.Run("Should start an election if leader is down", func(t *testing.T) {
 		w := &Watcher{
 			client: &mockWatcherClient{
-				fRequestVote: func(ctx context.Context, address, candidate string, term int64, priority int32) (*Vote, error) {
+				fRequestVote: func(ctx context.Context, address, candidate string, term int64) (*Vote, error) {
 					return &Vote{
 						Granted: true,
 					}, nil
 				},
 			},
 			config: Config{
-				HeartBeatCheckInterval:         5 * time.Millisecond,
-				LeaderAliveInterval:            10 * time.Millisecond,
-				LeaderDownNotificationInterval: 15 * time.Millisecond,
-				MaxDelayForElection:            1,
+				HeartBeatCheckInterval: 5 * time.Millisecond,
+				MaxDelayForElection:    1,
 			},
 			lastReceivedBeat: time.Now(),
-			leader:           &NodeInfo{},
 			nodes: []*NodeInfo{
 				{"192.168.0.10"},
 				{"191.168.0.11"},
@@ -210,7 +177,7 @@ func TestWatcher(t *testing.T) {
 	t.Run("Election should start with random delay", func(t *testing.T) {
 		w := &Watcher{
 			client: &mockWatcherClient{
-				fRequestVote: func(ctx context.Context, address, candidate string, term int64, priority int32) (*Vote, error) {
+				fRequestVote: func(ctx context.Context, address, candidate string, term int64) (*Vote, error) {
 					return &Vote{
 						Granted: true,
 					}, nil
@@ -242,7 +209,7 @@ func TestWatcher(t *testing.T) {
 	t.Run("Should increment the term when start an election", func(t *testing.T) {
 		w := &Watcher{
 			client: &mockWatcherClient{
-				fRequestVote: func(ctx context.Context, address, candidate string, term int64, priority int32) (*Vote, error) {
+				fRequestVote: func(ctx context.Context, address, candidate string, term int64) (*Vote, error) {
 					return &Vote{
 						Granted: true,
 					}, nil
@@ -263,7 +230,7 @@ func TestWatcher(t *testing.T) {
 	t.Run("Should vote for itself when start an election", func(t *testing.T) {
 		w := &Watcher{
 			client: &mockWatcherClient{
-				fRequestVote: func(ctx context.Context, address, candidate string, term int64, priority int32) (*Vote, error) {
+				fRequestVote: func(ctx context.Context, address, candidate string, term int64) (*Vote, error) {
 					return &Vote{
 						Granted: true,
 					}, nil
@@ -287,7 +254,7 @@ func TestWatcher(t *testing.T) {
 		requestedVote := false
 		w := &Watcher{
 			client: &mockWatcherClient{
-				fRequestVote: func(ctx context.Context, address, candidate string, term int64, priority int32) (*Vote, error) {
+				fRequestVote: func(ctx context.Context, address, candidate string, term int64) (*Vote, error) {
 					requestedVote = true
 					return &Vote{
 						Granted: true,
@@ -324,23 +291,13 @@ func TestWatcher(t *testing.T) {
 		assert.False(t, r.Granted)
 	})
 
-	t.Run("Should deny vote if it has a higher priority than the candidate", func(t *testing.T) {
-		w := &Watcher{
-			term:   2,
-			config: Config{Priority: 2},
-		}
-
-		r := w.OnReceiveVoteRequest(&Candidate{Term: 2, Priority: 1})
-		assert.False(t, r.Granted)
-	})
-
 	t.Run("Should return the current term when vote is denied", func(t *testing.T) {
 		w := &Watcher{
-			term:   2,
-			config: Config{Priority: 2},
+			term:     2,
+			votedFor: "other",
 		}
 
-		r := w.OnReceiveVoteRequest(&Candidate{Term: 2, Priority: 1})
+		r := w.OnReceiveVoteRequest(&Candidate{Term: 2})
 		assert.False(t, r.Granted)
 		assert.Equal(t, int64(2), r.Term)
 	})
@@ -348,20 +305,20 @@ func TestWatcher(t *testing.T) {
 	t.Run("Should grant vote", func(t *testing.T) {
 		w := &Watcher{
 			term:   2,
-			config: Config{Priority: 1},
+			config: Config{},
 		}
 
-		r := w.OnReceiveVoteRequest(&Candidate{Term: 2, Priority: 1})
+		r := w.OnReceiveVoteRequest(&Candidate{Term: 2})
 		assert.True(t, r.Granted)
 	})
 
 	t.Run("Should set votedFor when grant vote", func(t *testing.T) {
 		w := &Watcher{
 			term:   2,
-			config: Config{Priority: 1},
+			config: Config{},
 		}
 
-		r := w.OnReceiveVoteRequest(&Candidate{2, "192.168.0.10", 1})
+		r := w.OnReceiveVoteRequest(&Candidate{2, "192.168.0.10"})
 		assert.True(t, r.Granted)
 		assert.Equal(t, "192.168.0.10", w.votedFor)
 	})
@@ -369,66 +326,11 @@ func TestWatcher(t *testing.T) {
 	t.Run("Update the term when vote is granted", func(t *testing.T) {
 		w := &Watcher{
 			term:   2,
-			config: Config{Priority: 1},
+			config: Config{},
 		}
 
-		r := w.OnReceiveVoteRequest(&Candidate{3, "192.168.0.10", 1})
+		r := w.OnReceiveVoteRequest(&Candidate{3, "192.168.0.10"})
 		assert.True(t, r.Granted)
 		assert.Equal(t, int64(3), w.term)
-	})
-
-	t.Run("Should register nodes", func(t *testing.T) {
-		w := &Watcher{
-			config: Config{
-				RegistrationKey: "key",
-			},
-			registerLocker: &sync.Mutex{},
-		}
-		_, err := w.RegisterNode(&NodeInfo{Address: "http://localhost:8080"}, "key")
-		assert.NoError(t, err)
-		_, err = w.RegisterNode(&NodeInfo{Address: "http://localhost:8081"}, "key")
-		assert.NoError(t, err)
-		assert.Equal(t, 2, len(w.nodes))
-	})
-
-	t.Run("Node Register should fail if the key does not matches", func(t *testing.T) {
-		w := &Watcher{config: Config{RegistrationKey: "key"}}
-		_, err := w.RegisterNode(&NodeInfo{Address: "http://localhost:8080"}, "key1")
-		assert.Error(t, err)
-		assert.Equal(t, 0, len(w.nodes))
-	})
-
-	t.Run("Should return all registered nodes, on new node registration", func(t *testing.T) {
-		w := &Watcher{
-			config:         Config{RegistrationKey: "key"},
-			registerLocker: &sync.Mutex{},
-		}
-		nodes, err := w.RegisterNode(&NodeInfo{Address: "http://localhost:8080"}, "key")
-		assert.NoError(t, err)
-		assert.Equal(t, 1, len(nodes))
-		nodes, err = w.RegisterNode(&NodeInfo{Address: "http://localhost:8081"}, "key")
-		assert.NoError(t, err)
-		assert.Equal(t, 2, len(nodes))
-		nodes, err = w.RegisterNode(&NodeInfo{Address: "http://localhost:8082"}, "key")
-		assert.NoError(t, err)
-		assert.Equal(t, 3, len(nodes))
-	})
-
-	t.Run("The leader should be set after requesting registration", func(t *testing.T) {
-		w := &Watcher{
-			config:         Config{RegistrationKey: "key"},
-			registerLocker: &sync.Mutex{},
-			client: &mockWatcherClient{
-				fRequestRegister: func(ctx context.Context, address, key string) (*RegisterResponse, error) {
-					return &RegisterResponse{
-						Success: true,
-						Nodes:   []*NodeInfo{{Address: "http://localhost:8081"}},
-					}, nil
-				},
-			},
-		}
-		err := w.RequestRegister("localhost:8080", "key")
-		assert.NoError(t, err)
-		assert.NotNil(t, w.leader)
 	})
 }
