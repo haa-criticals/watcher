@@ -51,6 +51,7 @@ type Watcher struct {
 	config                         Config
 	OnElectionWon                  func(*Watcher, int64)
 	electionLock                   sync.Mutex
+	isLeader                       bool
 }
 
 func New(client Client, config Config) *Watcher {
@@ -171,6 +172,7 @@ func (w *Watcher) requestVote(node *NodeInfo) {
 
 func (w *Watcher) onElected() {
 	w.StopHeartBeatChecking()
+	w.isLeader = true
 	if w.OnElectionWon != nil {
 		w.OnElectionWon(w, w.term)
 	}
@@ -197,4 +199,8 @@ func (w *Watcher) OnReceiveVoteRequest(request *Candidate) *Vote {
 		Granted: true,
 		Term:    w.term,
 	}
+}
+
+func (w *Watcher) IsLeader() bool {
+	return w.isLeader
 }

@@ -56,10 +56,10 @@ func startNewNode(t *testing.T, address string, config *Config, provider provisi
 
 func discoverLeader(t *testing.T, nodes ...*App) (*App, *App, *App) {
 	t.Helper()
-	if nodes[0].isLeader {
+	if nodes[0].IsLeader() {
 		return nodes[0], nodes[1], nodes[2]
 	}
-	if nodes[1].isLeader {
+	if nodes[1].IsLeader() {
 		return nodes[1], nodes[0], nodes[2]
 	}
 	return nodes[2], nodes[0], nodes[1]
@@ -178,12 +178,12 @@ func TestApp(t *testing.T) {
 
 		leader, n1, n2 := discoverLeader(t, node1, node2, node3)
 
-		assert.True(t, leader.isLeader)
-		assert.False(t, n1.isLeader)
-		assert.False(t, n2.isLeader)
+		assert.True(t, leader.IsLeader())
+		assert.False(t, n1.IsLeader())
+		assert.False(t, n2.IsLeader())
 		leader.Stop()
 		time.Sleep(500 * time.Millisecond)
-		assert.True(t, n1.isLeader || n2.isLeader)
+		assert.True(t, n1.IsLeader() || n2.IsLeader())
 		n1.Stop()
 		n2.Stop()
 	})
@@ -218,12 +218,12 @@ func TestApp(t *testing.T) {
 		time.Sleep(200 * time.Millisecond)
 
 		leader, n1, n2 := discoverLeader(t, node1, node2, node3)
-		assert.True(t, leader.isLeader)
-		assert.False(t, n1.isLeader)
-		assert.False(t, n2.isLeader)
+		assert.True(t, leader.IsLeader())
+		assert.False(t, n1.IsLeader())
+		assert.False(t, n2.IsLeader())
 		leader.Stop()
 		time.Sleep(500 * time.Millisecond)
-		assert.True(t, n1.isLeader || n2.isLeader)
+		assert.True(t, n1.IsLeader() || n2.IsLeader())
 		assert.True(t, n1.monitor.IsMonitoring() || n2.monitor.IsMonitoring())
 		n1.Stop()
 		n2.Stop()
@@ -263,14 +263,68 @@ func TestApp(t *testing.T) {
 
 		leader, n1, n2 := discoverLeader(t, node1, node2, node3)
 
-		assert.True(t, leader.isLeader)
-		assert.False(t, n1.isLeader)
-		assert.False(t, n2.isLeader)
+		assert.True(t, leader.IsLeader())
+		assert.False(t, n1.IsLeader())
+		assert.False(t, n2.IsLeader())
 		leader.Stop()
 		time.Sleep(500 * time.Millisecond)
-		assert.True(t, n1.isLeader || n2.isLeader)
+		assert.True(t, n1.IsLeader() || n2.IsLeader())
 		assert.True(t, providerCalled)
 		n1.Stop()
 		n2.Stop()
+	})
+
+	t.Run("The old leaader should call the provider to destroy the resources", func(t *testing.T) {
+
+		providerCalled := false
+		provider := &mockProvider{
+			fCreate: func(ctx context.Context) error {
+				return nil
+			},
+			fDestroy: func(ctx context.Context) error {
+				providerCalled = true
+				return nil
+			},
+		}
+
+		monitorHB := monitor.WithHeartBeat(igrpc.NewWatchClient(), 5*time.Millisecond)
+
+		node1 := startNewNode(t, ":50051", &Config{
+			Address: ":50051",
+			Peers:   []string{":50052", ":50053"},
+		}, provider, watcher.Config{
+			MaxDelayForElection:    50,
+			HeartBeatCheckInterval: 15 * time.Millisecond,
+		}, monitorHB)
+
+		node2 := startNewNode(t, ":50052", &Config{
+			Address: ":50052",
+			Peers:   []string{":50051", ":50053"},
+		}, provider, defaultWc, monitorHB)
+
+		node3 := startNewNode(t, ":50053", &Config{
+			Address: ":50053",
+			Peers:   []string{":50051", ":50052"},
+		}, provider, defaultWc, monitorHB)
+
+		time.Sleep(200 * time.Millisecond)
+
+		leader, n1, n2 := discoverLeader(t, node1, node2, node3)
+		assert.True(t, leader.IsLeader())
+		assert.False(t, n1.IsLeader())
+		assert.False(t, n2.IsLeader())
+
+		leader.Stop()
+		time.Sleep(500 * time.Millisecond)
+		assert.True(t, n1.IsLeader() || n2.IsLeader())
+		go func() {
+			err := leader.Start()
+			if err != nil {
+				t.Errorf("failed to start old leader %v", err)
+			}
+		}()
+		time.Sleep(2 * time.Second)
+		assert.True(t, providerCalled)
+
 	})
 }

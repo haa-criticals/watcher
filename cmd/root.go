@@ -22,6 +22,7 @@ var (
 	peers               []string
 	heartBeatInterval   uint64
 	healthCheckInterval uint64
+	healthCheckEndpoint string
 	watch               bool
 	baseUrl             string
 	token               string
@@ -56,18 +57,21 @@ to quickly create a Cobra application.`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	Run: func(cmd *cobra.Command, args []string) {
-		w := watcher.New(grpc.NewWatchClient(), watcher.Config{
+
+		client := grpc.NewWatchClient()
+		w := watcher.New(client, watcher.Config{
 			Address:                address,
 			HeartBeatCheckInterval: time.Duration(heartBeatInterval+1) * time.Second,
 			MaxDelayForElection:    5000,
 		})
 		m := monitor.New(
-			monitor.WithHeartBeat(grpc.NewWatchClient(), time.Duration(heartBeatInterval)*time.Second),
-			monitor.WithHealthCheck("https://www.google.com", time.Duration(healthCheckInterval)*time.Second, 3),
+			monitor.WithHeartBeat(client, time.Duration(heartBeatInterval)*time.Second),
+			monitor.WithHealthCheck(healthCheckEndpoint, time.Duration(healthCheckInterval)*time.Second, 3),
 		)
 
 		a := app.New(w, m, provisioner.WithProvider(&providerConsole{}), &app.Config{
 			Address: address,
+			Peers:   peers,
 		})
 		if err := a.Start(); err != nil {
 			log.Fatalf("Error starting server: %v", err)
@@ -95,12 +99,13 @@ func init() {
 	rootCmd.PersistentFlags().StringToStringVarP(&variables, "variables", "v", nil, "The variables to use with the provisioner's provider")
 	rootCmd.Flags().StringVarP(&address, "address", "a", ":8080", "The bind address this watcher")
 	rootCmd.Flags().StringSliceVarP(&peers, "peers", "p", nil, "The peers to connect to")
-	rootCmd.Flags().Uint64VarP(&heartBeatInterval, "heartbeat-interval", "hb", 5, "The interval to send heartbeats in seconds")
-	rootCmd.Flags().Uint64VarP(&healthCheckInterval, "healthcheck-interval", "hc", 5, "The interval to send healthchecks in seconds")
+	rootCmd.Flags().Uint64Var(&heartBeatInterval, "heartbeat-interval", 5, "The interval to send heartbeats in seconds")
+	rootCmd.Flags().Uint64Var(&healthCheckInterval, "healthcheck-interval", 5, "The interval to send healthchecks in seconds")
+	rootCmd.Flags().StringVarP(&healthCheckEndpoint, "healthcheck-endpoint", "e", "", "The endpoint to send healthchecks to")
 	_ = rootCmd.MarkFlagRequired("base-url")
 	_ = rootCmd.MarkFlagRequired("token")
 	_ = rootCmd.MarkFlagRequired("project-id")
-
+	_ = rootCmd.MarkFlagRequired("healthcheck-endpoint")
 	err := viper.BindPFlags(rootCmd.PersistentFlags())
 	if err != nil {
 		log.Printf("Error binding flags: %v", err)

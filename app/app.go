@@ -23,7 +23,6 @@ type App struct {
 	watcher     *watcher.Watcher
 	monitor     *monitor.Monitor
 	config      *Config
-	isLeader    bool
 	provisioner *provisioner.Manager
 	server      *grpc.Server
 }
@@ -42,7 +41,6 @@ func New(w *watcher.Watcher, monitor *monitor.Monitor, provisioner *provisioner.
 	}
 
 	w.OnElectionWon = func(w *watcher.Watcher, term int64) {
-		app.isLeader = true
 		go monitor.StartHeartBeating()
 		go monitor.StartHealthChecks()
 		err := provisioner.Create(context.Background())
@@ -53,8 +51,12 @@ func New(w *watcher.Watcher, monitor *monitor.Monitor, provisioner *provisioner.
 	return app
 }
 
-func (a *App) Heartbeat(_ context.Context, in *pb.Beat) (*emptypb.Empty, error) {
-	a.watcher.OnReceiveHeartBeat(in.Timestamp.AsTime())
+func (a *App) IsLeader() bool {
+	return a.watcher.IsLeader()
+}
+
+func (a *App) Heartbeat(_ context.Context, beat *pb.Beat) (*emptypb.Empty, error) {
+	a.watcher.OnReceiveHeartBeat(beat.Timestamp.AsTime())
 	return &emptypb.Empty{}, nil
 }
 
