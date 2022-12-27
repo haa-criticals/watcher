@@ -114,7 +114,6 @@ func (w *Watcher) OnReceiveHeartBeat(heartBeatTime time.Time) {
 	if !w.checkingHeartBeat {
 		go w.StartHeartBeatChecking()
 	}
-	log.Printf("%s Received heart beat", w.Address)
 }
 
 func (w *Watcher) onNoReceivedHeartBeat() {

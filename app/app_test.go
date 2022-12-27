@@ -39,7 +39,7 @@ var (
 func startNewNode(t *testing.T, address string, config *Config, provider provisioner.Provider, wc watcher.Config, monitorOpts ...monitor.Option) *App {
 	t.Helper()
 	node := New(
-		watcher.New(igrpc.NewWatchClient(address), wc),
+		watcher.New(igrpc.NewWatchClient(), wc),
 		monitor.New(monitorOpts...),
 		provisioner.WithProvider(provider),
 		config,
@@ -76,7 +76,7 @@ func TestAppStart(t *testing.T) {
 			},
 		}
 
-		monitorHB := monitor.WithHeartBeat(igrpc.NewNotifier(), 1*time.Millisecond)
+		monitorHB := monitor.WithHeartBeat(igrpc.NewWatchClient(), 1*time.Millisecond)
 
 		node1 := startNewNode(t, ":50051", &Config{
 			Address: ":50051",
@@ -117,7 +117,7 @@ func TestAppStart(t *testing.T) {
 			},
 		}
 
-		monitorHB := monitor.WithHeartBeat(igrpc.NewNotifier(), 5*time.Millisecond)
+		monitorHB := monitor.WithHeartBeat(igrpc.NewWatchClient(), 5*time.Millisecond)
 		monitorHC := monitor.WithHealthCheck(fmt.Sprintf("http://%s%s", server.Listener.Addr(), "/health"), 1*time.Millisecond, 3)
 
 		node1 := startNewNode(t, ":50051", &Config{
@@ -154,7 +154,7 @@ func TestApp(t *testing.T) {
 			},
 		}
 
-		monitorHB := monitor.WithHeartBeat(igrpc.NewNotifier(), 5*time.Millisecond)
+		monitorHB := monitor.WithHeartBeat(igrpc.NewWatchClient(), 5*time.Millisecond)
 
 		node1 := startNewNode(t, ":50051", &Config{
 			Address: ":50051",
@@ -195,7 +195,7 @@ func TestApp(t *testing.T) {
 			},
 		}
 
-		monitorHB := monitor.WithHeartBeat(igrpc.NewNotifier(), 5*time.Millisecond)
+		monitorHB := monitor.WithHeartBeat(igrpc.NewWatchClient(), 5*time.Millisecond)
 
 		node1 := startNewNode(t, ":50051", &Config{
 			Address: ":50051",
@@ -239,7 +239,7 @@ func TestApp(t *testing.T) {
 			},
 		}
 
-		monitorHB := monitor.WithHeartBeat(igrpc.NewNotifier(), 5*time.Millisecond)
+		monitorHB := monitor.WithHeartBeat(igrpc.NewWatchClient(), 5*time.Millisecond)
 
 		node1 := startNewNode(t, ":50051", &Config{
 			Address: ":50051",

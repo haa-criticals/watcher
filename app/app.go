@@ -42,7 +42,6 @@ func New(w *watcher.Watcher, monitor *monitor.Monitor, provisioner *provisioner.
 	}
 
 	w.OnElectionWon = func(w *watcher.Watcher, term int64) {
-		log.Printf("Election won by %s on term %d", w.Address, term)
 		app.isLeader = true
 		go monitor.StartHeartBeating()
 		go monitor.StartHealthChecks()

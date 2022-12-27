@@ -17,15 +17,17 @@ import (
 )
 
 var (
-	cfgFile    string
-	address    string
-	peers      []string
-	watch      bool
-	baseUrl    string
-	token      string
-	projectId  int64
-	projectRef string
-	variables  map[string]string
+	cfgFile             string
+	address             string
+	peers               []string
+	heartBeatInterval   uint64
+	healthCheckInterval uint64
+	watch               bool
+	baseUrl             string
+	token               string
+	projectId           int64
+	projectRef          string
+	variables           map[string]string
 )
 
 type providerConsole struct {
@@ -54,13 +56,14 @@ to quickly create a Cobra application.`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	Run: func(cmd *cobra.Command, args []string) {
-		w := watcher.New(
-			grpc.NewWatchClient(address),
-			watcher.Config{},
-		)
+		w := watcher.New(grpc.NewWatchClient(), watcher.Config{
+			Address:                address,
+			HeartBeatCheckInterval: time.Duration(heartBeatInterval+1) * time.Second,
+			MaxDelayForElection:    5000,
+		})
 		m := monitor.New(
-			monitor.WithHeartBeat(grpc.NewNotifier(), 5*time.Second),
-			monitor.WithHealthCheck("https://www.google.com", 5*time.Minute, 3),
+			monitor.WithHeartBeat(grpc.NewWatchClient(), time.Duration(heartBeatInterval)*time.Second),
+			monitor.WithHealthCheck("https://www.google.com", time.Duration(healthCheckInterval)*time.Second, 3),
 		)
 
 		a := app.New(w, m, provisioner.WithProvider(&providerConsole{}), &app.Config{
@@ -92,6 +95,8 @@ func init() {
 	rootCmd.PersistentFlags().StringToStringVarP(&variables, "variables", "v", nil, "The variables to use with the provisioner's provider")
 	rootCmd.Flags().StringVarP(&address, "address", "a", ":8080", "The bind address this watcher")
 	rootCmd.Flags().StringSliceVarP(&peers, "peers", "p", nil, "The peers to connect to")
+	rootCmd.Flags().Uint64VarP(&heartBeatInterval, "heartbeat-interval", "hb", 5, "The interval to send heartbeats in seconds")
+	rootCmd.Flags().Uint64VarP(&healthCheckInterval, "healthcheck-interval", "hc", 5, "The interval to send healthchecks in seconds")
 	_ = rootCmd.MarkFlagRequired("base-url")
 	_ = rootCmd.MarkFlagRequired("token")
 	_ = rootCmd.MarkFlagRequired("project-id")
