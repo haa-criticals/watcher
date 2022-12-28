@@ -115,11 +115,13 @@ func (w *Watcher) StopHeartBeatChecking() {
 func (w *Watcher) OnReceiveHeartBeat(address string, term int64, heartBeatTime time.Time) {
 	log.Printf("%s received heartbeat from %s on term %d", w.Address, address, term)
 	w.lastReceivedBeat = heartBeatTime
-	if w.isLeader && term > w.term {
-		w.isLeader = false
+	if term > w.term {
 		w.term = term
-		if w.OnLostLeadership != nil {
-			go w.OnLostLeadership(w, term)
+		if w.isLeader {
+			w.isLeader = false
+			if w.OnLostLeadership != nil {
+				go w.OnLostLeadership(w, term)
+			}
 		}
 	}
 	if !w.checkingHeartBeat {
@@ -152,7 +154,7 @@ func (w *Watcher) requestVotes() {
 	defer w.electionLock.Unlock()
 	w.electionTimer = nil
 	if w.isLeaderAlive() {
-		log.Printf("%s Leader is alive, no need to start election", w.Address)
+		log.Printf("%s Leader is alive, no need to request votes", w.Address)
 		return
 	}
 	log.Printf("%s is requesting votes on term %d", w.Address, w.term+1)
