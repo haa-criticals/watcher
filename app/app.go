@@ -29,9 +29,10 @@ type App struct {
 
 func New(w *watcher.Watcher, monitor *monitor.Monitor, provisioner *provisioner.Manager, config *Config) *App {
 	w.Address = config.Address
+	monitor.Address = config.Address
 	w.RegisterNodes(config.Peers...)
 	for _, peer := range config.Peers {
-		monitor.RegisterWatcher(&watcher.NodeInfo{Address: peer})
+		monitor.RegisterWatcher(&watcher.Peer{Address: peer})
 	}
 	app := &App{
 		watcher:     w,
@@ -41,6 +42,7 @@ func New(w *watcher.Watcher, monitor *monitor.Monitor, provisioner *provisioner.
 	}
 
 	w.OnElectionWon = func(w *watcher.Watcher, term int64) {
+		monitor.NewTerm(term)
 		go monitor.StartHeartBeating()
 		go monitor.StartHealthChecks()
 		err := provisioner.Create(context.Background())
@@ -48,6 +50,16 @@ func New(w *watcher.Watcher, monitor *monitor.Monitor, provisioner *provisioner.
 			log.Println("failed to create resources", err)
 		}
 	}
+
+	w.OnLostLeadership = func(w *watcher.Watcher, term int64) {
+		log.Printf("%s Lost leadership in term %d", w.Address, term)
+		go monitor.Stop()
+		err := provisioner.Destroy(context.Background())
+		if err != nil {
+			log.Println("failed to destroy resources", err)
+		}
+	}
+
 	return app
 }
 
@@ -56,7 +68,7 @@ func (a *App) IsLeader() bool {
 }
 
 func (a *App) Heartbeat(_ context.Context, beat *pb.Beat) (*emptypb.Empty, error) {
-	a.watcher.OnReceiveHeartBeat(beat.Timestamp.AsTime())
+	a.watcher.OnReceiveHeartBeat(beat.Address, beat.Term, beat.Timestamp.AsTime())
 	return &emptypb.Empty{}, nil
 }
 

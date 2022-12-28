@@ -9,7 +9,7 @@ import (
 
 type mockWatcherClient struct {
 	fRequestRegister func(ctx context.Context, address, key string) (*RegisterResponse, error)
-	fAckNode         func(ctx context.Context, address, key string, node *NodeInfo) (*NodeInfo, error)
+	fAckNode         func(ctx context.Context, address, key string, node *Peer) (*Peer, error)
 	fRequestVote     func(ctx context.Context, address, candidate string, term int64) (*Vote, error)
 }
 
@@ -17,7 +17,7 @@ func (m *mockWatcherClient) RequestRegister(ctx context.Context, address, key st
 	return m.fRequestRegister(ctx, address, key)
 }
 
-func (m *mockWatcherClient) AckNode(ctx context.Context, address, key string, node *NodeInfo) (*NodeInfo, error) {
+func (m *mockWatcherClient) AckNode(ctx context.Context, address, key string, node *Peer) (*Peer, error) {
 	return m.fAckNode(ctx, address, key, node)
 }
 
@@ -34,7 +34,7 @@ func TestWatcher(t *testing.T) {
 				MaxDelayForElection:    1,
 			},
 			lastReceivedBeat: time.Now(),
-			OnLeaderDown: func(nodes []*NodeInfo, lastReceivedBeat time.Time) {
+			OnLeaderDown: func(nodes []*Peer, lastReceivedBeat time.Time) {
 				leaderDownTriggered = true
 			},
 		}
@@ -52,16 +52,16 @@ func TestWatcher(t *testing.T) {
 				MaxDelayForElection:    5,
 			},
 			lastReceivedBeat: time.Now(),
-			OnLeaderDown: func(nodes []*NodeInfo, lastReceivedBeat time.Time) {
+			OnLeaderDown: func(nodes []*Peer, lastReceivedBeat time.Time) {
 				leaderDownTriggered = true
 			},
 		}
 
 		go w.StartHeartBeatChecking()
 		time.Sleep(5 * time.Millisecond)
-		w.OnReceiveHeartBeat(time.Now())
+		w.OnReceiveHeartBeat("", 0, time.Now())
 		time.Sleep(5 * time.Millisecond)
-		w.OnReceiveHeartBeat(time.Now())
+		w.OnReceiveHeartBeat("", 0, time.Now())
 		assert.False(t, leaderDownTriggered)
 	})
 
@@ -73,7 +73,7 @@ func TestWatcher(t *testing.T) {
 				MaxDelayForElection:    1,
 			},
 			lastReceivedBeat: time.Now(),
-			OnLeaderDown: func(nodes []*NodeInfo, lastReceivedBeat time.Time) {
+			OnLeaderDown: func(nodes []*Peer, lastReceivedBeat time.Time) {
 				leaderDownTriggeredCount = leaderDownTriggeredCount + 1
 			},
 		}
@@ -93,7 +93,7 @@ func TestWatcher(t *testing.T) {
 			},
 			lastReceivedBeat:      time.Now(),
 			doneHeartBeatChecking: make(chan struct{}),
-			OnLeaderDown: func(nodes []*NodeInfo, lastReceivedBeat time.Time) {
+			OnLeaderDown: func(nodes []*Peer, lastReceivedBeat time.Time) {
 				leaderDownTriggered = true
 			},
 		}
@@ -113,7 +113,7 @@ func TestWatcher(t *testing.T) {
 				MaxDelayForElection:    1,
 			},
 			lastReceivedBeat: time.Now(),
-			OnLeaderDown: func(nodes []*NodeInfo, lastReceivedBeat time.Time) {
+			OnLeaderDown: func(nodes []*Peer, lastReceivedBeat time.Time) {
 				leaderDownTriggeredCount++
 			},
 		}
@@ -137,7 +137,7 @@ func TestWatcher(t *testing.T) {
 				MaxDelayForElection:    1,
 			},
 			lastReceivedBeat: time.Now(),
-			nodes: []*NodeInfo{
+			nodes: []*Peer{
 				{"node1"},
 				{"node2"},
 			},
@@ -162,7 +162,7 @@ func TestWatcher(t *testing.T) {
 				MaxDelayForElection:    1,
 			},
 			lastReceivedBeat: time.Now(),
-			nodes: []*NodeInfo{
+			nodes: []*Peer{
 				{"192.168.0.10"},
 				{"191.168.0.11"},
 			},
@@ -184,7 +184,7 @@ func TestWatcher(t *testing.T) {
 				},
 			},
 			config: Config{MaxDelayForElection: 30},
-			nodes: []*NodeInfo{
+			nodes: []*Peer{
 				{"192.168.0.10"},
 			},
 		}
@@ -217,7 +217,7 @@ func TestWatcher(t *testing.T) {
 			},
 			term:   1,
 			config: Config{MaxDelayForElection: 1},
-			nodes: []*NodeInfo{
+			nodes: []*Peer{
 				{"192.168.0.10"},
 			},
 		}
@@ -239,7 +239,7 @@ func TestWatcher(t *testing.T) {
 			Address: "192.168.0.1",
 			term:    1,
 			config:  Config{MaxDelayForElection: 1},
-			nodes: []*NodeInfo{
+			nodes: []*Peer{
 				{"192.168.0.10"},
 			},
 		}
@@ -262,7 +262,7 @@ func TestWatcher(t *testing.T) {
 				},
 			},
 			config: Config{MaxDelayForElection: 1},
-			nodes:  []*NodeInfo{{"node1"}},
+			nodes:  []*Peer{{"node1"}},
 		}
 
 		w.startElection()

@@ -10,13 +10,13 @@ import (
 )
 
 type ErrorHandler interface {
-	OnHeartBeatError(err error, watcher *watcher.NodeInfo)
+	OnHeartBeatError(err error, watcher *watcher.Peer)
 	OnHealthCheckError(err error)
 }
 
 type defaultErrorHandler struct{}
 
-func (d *defaultErrorHandler) OnHeartBeatError(err error, watcher *watcher.NodeInfo) {
+func (d *defaultErrorHandler) OnHeartBeatError(err error, watcher *watcher.Peer) {
 	log.Printf("error sending heart Beat to %s: %v", watcher.Address, err)
 }
 
@@ -27,16 +27,18 @@ func (d *defaultErrorHandler) OnHealthCheckError(err error) {
 type Monitor struct {
 	errorHandler      ErrorHandler
 	notifier          Notifier
-	watchers          []*watcher.NodeInfo
+	peers             []*watcher.Peer
 	healthChecker     *healthChecker
 	doneHeartBeat     chan struct{}
 	isHeartBeating    bool
 	heartBeatLock     sync.Mutex
 	heartBeatInterval time.Duration
+	term              int64
+	Address           string
 }
 
-func (m *Monitor) RegisterWatcher(watcher *watcher.NodeInfo) {
-	m.watchers = append(m.watchers, watcher)
+func (m *Monitor) RegisterWatcher(peer *watcher.Peer) {
+	m.peers = append(m.peers, peer)
 }
 
 func (m *Monitor) StartHeartBeating() {
@@ -66,22 +68,22 @@ func (m *Monitor) StartHeartBeating() {
 }
 
 func (m *Monitor) heartBeat() error {
-	if len(m.watchers) == 0 {
-		return fmt.Errorf("no watchers registered")
+	if len(m.peers) == 0 {
+		return fmt.Errorf("no peers registered")
 	}
 
 	wg := &sync.WaitGroup{}
-	wg.Add(len(m.watchers))
-	for _, w := range m.watchers {
+	wg.Add(len(m.peers))
+	for _, w := range m.peers {
 		go m.sendBeatToWatcher(wg, w)
 	}
 	wg.Wait()
 	return nil
 }
 
-func (m *Monitor) sendBeatToWatcher(wg *sync.WaitGroup, watcher *watcher.NodeInfo) {
+func (m *Monitor) sendBeatToWatcher(wg *sync.WaitGroup, watcher *watcher.Peer) {
 	defer wg.Done()
-	err := m.notifier.Beat(watcher.Address)
+	err := m.notifier.Beat(watcher.Address, m.Address, m.term)
 	if err != nil {
 		log.Printf("error sending heart Beat to %s: %v", watcher.Address, err)
 		m.errorHandler.OnHeartBeatError(err, watcher)
@@ -106,6 +108,10 @@ func (m *Monitor) Stop() {
 
 func (m *Monitor) IsMonitoring() bool {
 	return m.isHeartBeating || m.healthChecker.active
+}
+
+func (m *Monitor) NewTerm(term int64) {
+	m.term = term
 }
 
 func New(options ...Option) *Monitor {

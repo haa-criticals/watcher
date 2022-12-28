@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-type NodeInfo struct {
+type Peer struct {
 	Address string
 }
 
@@ -40,8 +40,8 @@ type Watcher struct {
 	checkingHeartBeat              bool
 	checkingHeartBeatLock          sync.Mutex
 	lastLeaderDownNotificationTime time.Time
-	OnLeaderDown                   func(nodes []*NodeInfo, lastBeat time.Time)
-	nodes                          []*NodeInfo
+	OnLeaderDown                   func(nodes []*Peer, lastBeat time.Time)
+	nodes                          []*Peer
 	client                         Client
 	Address                        string
 	election                       *election
@@ -52,6 +52,8 @@ type Watcher struct {
 	OnElectionWon                  func(*Watcher, int64)
 	electionLock                   sync.Mutex
 	isLeader                       bool
+	OnLostLeadership               func(watcher *Watcher, int642 int64)
+	electionTimer                  *time.Timer
 }
 
 func New(client Client, config Config) *Watcher {
@@ -71,7 +73,7 @@ func New(client Client, config Config) *Watcher {
 
 func (w *Watcher) RegisterNodes(nodes ...string) {
 	for _, node := range nodes {
-		w.nodes = append(w.nodes, &NodeInfo{Address: node})
+		w.nodes = append(w.nodes, &Peer{Address: node})
 	}
 }
 
@@ -110,8 +112,16 @@ func (w *Watcher) StopHeartBeatChecking() {
 	}
 }
 
-func (w *Watcher) OnReceiveHeartBeat(heartBeatTime time.Time) {
+func (w *Watcher) OnReceiveHeartBeat(address string, term int64, heartBeatTime time.Time) {
+	log.Printf("%s received heartbeat from %s on term %d", w.Address, address, term)
 	w.lastReceivedBeat = heartBeatTime
+	if w.isLeader && term > w.term {
+		w.isLeader = false
+		w.term = term
+		if w.OnLostLeadership != nil {
+			go w.OnLostLeadership(w, term)
+		}
+	}
 	if !w.checkingHeartBeat {
 		go w.StartHeartBeatChecking()
 	}
@@ -127,22 +137,26 @@ func (w *Watcher) onNoReceivedHeartBeat() {
 	}
 }
 func (w *Watcher) startElection() {
+	var err error
+	w.election, err = newElection(w.nodes, w.term)
+	if err != nil {
+		log.Println(err)
+		return
+	}
 	t := rand.Int63n(w.config.MaxDelayForElection)
-	time.AfterFunc(time.Duration(t)*time.Millisecond, w.requestVotes)
+	w.electionTimer = time.AfterFunc(time.Duration(t)*time.Millisecond, w.requestVotes)
 }
 
 func (w *Watcher) requestVotes() {
 	w.electionLock.Lock()
 	defer w.electionLock.Unlock()
+	w.electionTimer = nil
 	if w.isLeaderAlive() {
 		log.Printf("%s Leader is alive, no need to start election", w.Address)
 		return
 	}
 	log.Printf("%s is requesting votes on term %d", w.Address, w.term+1)
-	var err error
-	w.election, err = newElection(w.nodes)
-	if err != nil {
-		log.Println(err)
+	if w.term != w.election.term {
 		return
 	}
 	w.term++
@@ -153,7 +167,7 @@ func (w *Watcher) requestVotes() {
 	}
 }
 
-func (w *Watcher) requestVote(node *NodeInfo) {
+func (w *Watcher) requestVote(node *Peer) {
 	vote, err := w.client.RequestVote(context.Background(), node.Address, w.Address, w.term)
 	if err != nil || !vote.Granted {
 		w.election.onNonGrantedVote()
@@ -185,6 +199,10 @@ func (w *Watcher) LastReceivedBeat() time.Time {
 func (w *Watcher) OnReceiveVoteRequest(request *Candidate) *Vote {
 	w.electionLock.Lock()
 	defer w.electionLock.Unlock()
+	if w.electionTimer != nil {
+		w.electionTimer.Stop()
+		w.electionTimer = nil
+	}
 	if request.Term < w.term || (w.term == request.Term && w.votedFor != "") {
 		log.Printf("%s on term %d Rejected vote request from %s on term %d", w.Address, w.term, request.Address, request.Term)
 		return &Vote{

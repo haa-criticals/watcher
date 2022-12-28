@@ -20,8 +20,8 @@ func NewWatchClient() *Client {
 	return &Client{}
 }
 
-func (c *Client) Beat(watcherAddress string) error {
-	conn, err := grpc.Dial(watcherAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
+func (c *Client) Beat(peerAddress string, address string, term int64) error {
+	conn, err := grpc.Dial(peerAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return err
 	}
@@ -34,7 +34,7 @@ func (c *Client) Beat(watcherAddress string) error {
 	}(conn)
 
 	client := pb.NewWatcherClient(conn)
-	_, err = client.Heartbeat(context.Background(), &pb.Beat{Timestamp: timestamppb.New(time.Now())})
+	_, err = client.Heartbeat(context.Background(), &pb.Beat{Timestamp: timestamppb.New(time.Now()), Address: address, Term: term})
 	return err
 }
 

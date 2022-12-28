@@ -15,7 +15,7 @@ type testingErrorHandler struct {
 	receivedError error
 }
 
-func (f *testingErrorHandler) OnHeartBeatError(err error, watcher *watcher.NodeInfo) {
+func (f *testingErrorHandler) OnHeartBeatError(err error, watcher *watcher.Peer) {
 	f.receivedError = err
 	if f.failOnError {
 		f.t.Fatalf("error sending heart Beat to %s: %v", watcher.Address, err)
@@ -32,9 +32,9 @@ func (f *testingErrorHandler) OnHealthCheckError(err error) {
 func TestRegisterWatcher(t *testing.T) {
 	t.Run("Should register watchers", func(t *testing.T) {
 		m := New()
-		assert.Len(t, m.watchers, 0)
-		m.RegisterWatcher(&watcher.NodeInfo{})
-		assert.Len(t, m.watchers, 1)
+		assert.Len(t, m.peers, 0)
+		m.RegisterWatcher(&watcher.Peer{})
+		assert.Len(t, m.peers, 1)
 	})
 }
 
@@ -49,7 +49,7 @@ func TestHeartBeat(t *testing.T) {
 
 		m := New(WithErrorHandler(&testingErrorHandler{t: t, failOnError: true}))
 
-		m.watchers = []*watcher.NodeInfo{
+		m.peers = []*watcher.Peer{
 			{Address: endpoint1.baseURL()},
 			{Address: endpoint2.baseURL()},
 		}
@@ -69,7 +69,7 @@ func TestHeartBeat(t *testing.T) {
 		m := New()
 		err := m.heartBeat()
 		if assert.Error(t, err) {
-			assert.Equal(t, "no watchers registered", err.Error())
+			assert.Equal(t, "no peers registered", err.Error())
 		}
 	})
 
@@ -77,7 +77,7 @@ func TestHeartBeat(t *testing.T) {
 		handler := &testingErrorHandler{t: t}
 		m := New(WithErrorHandler(handler))
 
-		m.watchers = []*watcher.NodeInfo{
+		m.peers = []*watcher.Peer{
 			{Address: "http://localhost:1234"},
 		}
 
@@ -97,7 +97,7 @@ func TestHeartBeat(t *testing.T) {
 			WithHeartBeat(&defaultNotifier{}, 1*time.Millisecond),
 		)
 
-		m.watchers = []*watcher.NodeInfo{
+		m.peers = []*watcher.Peer{
 			{Address: endpoint1.baseURL()},
 			{Address: endpoint2.baseURL()},
 		}
@@ -122,7 +122,7 @@ func TestMonitor(t *testing.T) {
 			WithHealthCheck(fmt.Sprintf("%s/healthz", endpoint1.baseURL()), 5*time.Millisecond, 3),
 		)
 
-		m.RegisterWatcher(&watcher.NodeInfo{
+		m.RegisterWatcher(&watcher.Peer{
 			Address: fmt.Sprintf(endpoint1.baseURL()),
 		})
 
@@ -145,7 +145,7 @@ func TestMonitor(t *testing.T) {
 			WithHeartBeat(&defaultNotifier{}, 5*time.Millisecond),
 		)
 
-		m.RegisterWatcher(&watcher.NodeInfo{
+		m.RegisterWatcher(&watcher.Peer{
 			Address: fmt.Sprintf(endpoint1.baseURL()),
 		})
 
@@ -189,14 +189,14 @@ func TestMonitor(t *testing.T) {
 		m := New(WithHealthCheck(fmt.Sprintf("%s/healthz", endpoint1.baseURL()), 1*time.Millisecond, 3))
 		go m.StartHealthChecks()
 		endpoint1.stop()
-		time.Sleep(4 * time.Millisecond)
+		time.Sleep(6 * time.Millisecond)
 		m.Stop()
 		assert.Falsef(t, m.IsHealthy(), "Should be unhealthy")
 
 		endpoint1.start()
 		m.healthChecker.endpoint = fmt.Sprintf("%s/healthz", endpoint1.baseURL())
 		go m.StartHealthChecks()
-		time.Sleep(2 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 		assert.True(t, m.IsHealthy(), "Should be healthy")
 
 		m.Stop()

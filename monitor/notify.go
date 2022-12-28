@@ -6,14 +6,14 @@ import (
 )
 
 type Notifier interface {
-	Beat(watcherAddress string) error
+	Beat(peerAddress string, address string, term int64) error
 }
 
 type defaultNotifier struct {
 }
 
-func (n *defaultNotifier) Beat(watcherAddress string) error {
-	r, err := http.NewRequest("POST", fmt.Sprintf("%s/monitor/beat", watcherAddress), nil)
+func (n *defaultNotifier) Beat(peerAddress string, _ string, _ int64) error {
+	r, err := http.NewRequest("POST", fmt.Sprintf("%s/monitor/beat", peerAddress), nil)
 	if err != nil {
 		return err
 	}

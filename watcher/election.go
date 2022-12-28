@@ -15,11 +15,12 @@ const (
 )
 
 type election struct {
-	nodes     []*NodeInfo
+	nodes     []*Peer
 	startedAt time.Time
 	rejected  int
 	granted   int
 	finished  bool
+	term      int64
 }
 
 func (e *election) onNonGrantedVote() {
@@ -46,12 +47,13 @@ func (e *election) currentState() electionState {
 	return state
 }
 
-func newElection(nodes []*NodeInfo) (*election, error) {
+func newElection(nodes []*Peer, term int64) (*election, error) {
 	if len(nodes) == 0 {
 		return nil, errors.New("no nodes to start election")
 	}
 	return &election{
 		nodes:     nodes,
 		startedAt: time.Now(),
+		term:      term,
 	}, nil
 }

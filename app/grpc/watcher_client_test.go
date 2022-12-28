@@ -47,7 +47,7 @@ func TestNotifier(t *testing.T) {
 		}()
 
 		notifier := NewWatchClient()
-		err := notifier.Beat("localhost:50051")
+		err := notifier.Beat("localhost:50051", "", 0)
 		assert.NoError(t, err)
 		assert.Len(t, server.beats, 1)
 		server.server.Stop()

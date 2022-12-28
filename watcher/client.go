@@ -6,7 +6,7 @@ import (
 
 type RegisterResponse struct {
 	Success bool
-	Nodes   []*NodeInfo
+	Nodes   []*Peer
 }
 
 type Client interface {

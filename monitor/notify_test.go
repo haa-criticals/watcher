@@ -54,7 +54,7 @@ func TestBeat(t *testing.T) {
 		n := &defaultNotifier{}
 		start := time.Now()
 
-		err := n.Beat(m.baseURL())
+		err := n.Beat(m.baseURL(), "", 0)
 		assert.NoError(t, err)
 		assert.NotNil(t, m.lastBeat)
 		assert.True(t, m.lastBeat.After(start), "last Beat should be after start")

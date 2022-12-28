@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com.haa-criticals/watcher/provisioner"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -174,7 +175,7 @@ func TestApp(t *testing.T) {
 			Peers:   []string{":50051", ":50052"},
 		}, provider, defaultWc, monitorHB)
 
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(300 * time.Millisecond)
 
 		leader, n1, n2 := discoverLeader(t, node1, node2, node3)
 
@@ -292,10 +293,7 @@ func TestApp(t *testing.T) {
 		node1 := startNewNode(t, ":50051", &Config{
 			Address: ":50051",
 			Peers:   []string{":50052", ":50053"},
-		}, provider, watcher.Config{
-			MaxDelayForElection:    50,
-			HeartBeatCheckInterval: 15 * time.Millisecond,
-		}, monitorHB)
+		}, provider, defaultWc, monitorHB)
 
 		node2 := startNewNode(t, ":50052", &Config{
 			Address: ":50052",
@@ -317,13 +315,14 @@ func TestApp(t *testing.T) {
 		leader.Stop()
 		time.Sleep(500 * time.Millisecond)
 		assert.True(t, n1.IsLeader() || n2.IsLeader())
+		log.Println("Old Leader starting")
 		go func() {
 			err := leader.Start()
 			if err != nil {
 				t.Errorf("failed to start old leader %v", err)
 			}
 		}()
-		time.Sleep(2 * time.Second)
+		time.Sleep(500 * time.Millisecond)
 		assert.True(t, providerCalled)
 
 	})
