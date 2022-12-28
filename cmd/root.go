@@ -23,6 +23,7 @@ var (
 	heartBeatInterval   uint64
 	healthCheckInterval uint64
 	healthCheckEndpoint string
+	provider            string
 	watch               bool
 	baseUrl             string
 	token               string
@@ -69,7 +70,22 @@ to quickly create a Cobra application.`,
 			monitor.WithHealthCheck(healthCheckEndpoint, time.Duration(healthCheckInterval)*time.Second, 3),
 		)
 
-		a := app.New(w, m, provisioner.WithProvider(&providerConsole{}), &app.Config{
+		var p *provisioner.Manager
+		switch provider {
+		case "gitlab":
+			p = provisioner.New(&provisioner.Config{
+				BaseUrl:   baseUrl,
+				Token:     token,
+				ProjectId: projectId,
+				Ref:       projectRef,
+				Variables: variables,
+				Watch:     watch,
+			})
+		default:
+			p = provisioner.WithProvider(&providerConsole{})
+		}
+
+		a := app.New(w, m, p, &app.Config{
 			Address: address,
 			Peers:   peers,
 		})
@@ -92,6 +108,7 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "c", "config file (default is $HOME/.watcher.yaml)")
+	rootCmd.PersistentFlags().StringVarP(&provider, "provider", "P", "gitlab", "provider to use")
 	rootCmd.PersistentFlags().StringVarP(&baseUrl, "base-url", "b", "", "The base url of the provisioner's provider")
 	rootCmd.PersistentFlags().StringVarP(&token, "token", "t", "", "The token to use to authenticate with the provisioner's provider")
 	rootCmd.PersistentFlags().Int64VarP(&projectId, "project-id", "i", 0, "The project id to use to authenticate with the provisioner's provider")
