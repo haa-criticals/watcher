@@ -44,6 +44,4 @@ func init() {
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
-	createCmd.Flags().BoolVar(&watch, "watch", false, "watch for progress")
-
 }
