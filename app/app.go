@@ -44,11 +44,11 @@ func New(w *watcher.Watcher, monitor *monitor.Monitor, provisioner *provisioner.
 	w.OnElectionWon = func(w *watcher.Watcher, term int64) {
 		monitor.NewTerm(term)
 		go monitor.StartHeartBeating()
-		go monitor.StartHealthChecks()
 		err := provisioner.Create(context.Background())
 		if err != nil {
 			log.Println("failed to create resources", err)
 		}
+		go monitor.StartHealthChecks()
 	}
 
 	w.OnLostLeadership = func(w *watcher.Watcher, term int64) {
