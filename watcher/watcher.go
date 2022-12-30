@@ -215,6 +215,12 @@ func (w *Watcher) OnReceiveVoteRequest(request *Candidate) *Vote {
 	log.Printf("%s on term %d granted vote to %s on term %d", w.Address, w.term, request.Address, request.Term)
 	w.votedFor = request.Address
 	w.term = request.Term
+	if w.isLeader {
+		w.isLeader = false
+		if w.OnLostLeadership != nil {
+			go w.OnLostLeadership(w, w.term)
+		}
+	}
 	return &Vote{
 		Granted: true,
 		Term:    w.term,
