@@ -51,6 +51,7 @@ func (m *Monitor) StartHeartBeating() {
 	m.isHeartBeating = true
 	m.heartBeatLock.Unlock()
 
+	_ = m.heartBeat()
 	t := time.NewTicker(m.heartBeatInterval)
 	for {
 		select {

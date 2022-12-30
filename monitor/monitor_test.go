@@ -112,7 +112,7 @@ func TestHeartBeat(t *testing.T) {
 }
 
 func TestMonitor(t *testing.T) {
-	t.Run("Should send at most 2 heart beats and 2 health checks in 2 millisecs", func(t *testing.T) {
+	t.Run("Should send at most 3 heart beats and 2 health checks in 10 millisecs", func(t *testing.T) {
 		endpoint1 := &mockEndpoint{}
 		endpoint1.start()
 
@@ -130,10 +130,10 @@ func TestMonitor(t *testing.T) {
 		go m.StartHealthChecks()
 		time.Sleep(10 * time.Millisecond)
 		m.Stop()
-		time.Sleep(15 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 		endpoint1.stop()
 		assert.LessOrEqual(t, endpoint1.healthCheckCount, 2)
-		assert.LessOrEqual(t, endpoint1.beatCount, 2)
+		assert.LessOrEqual(t, endpoint1.beatCount, 3)
 	})
 
 	t.Run("Only one heart beating should be running at a time", func(t *testing.T) {
@@ -153,7 +153,7 @@ func TestMonitor(t *testing.T) {
 		go m.StartHeartBeating()
 		time.Sleep(15 * time.Millisecond)
 		m.Stop()
-		assert.LessOrEqual(t, endpoint1.beatCount, 3)
+		assert.LessOrEqual(t, endpoint1.beatCount, 4)
 	})
 
 	t.Run("Only one health check should be running at a time", func(t *testing.T) {
