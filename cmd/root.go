@@ -114,7 +114,7 @@ func init() {
 	rootCmd.PersistentFlags().Int64VarP(&projectId, "project-id", "i", 0, "The project id to use to authenticate with the provisioner's provider")
 	rootCmd.PersistentFlags().StringVarP(&projectRef, "project-ref", "r", "main", "The project ref to use with the provisioner's provider")
 	rootCmd.PersistentFlags().StringToStringVarP(&variables, "variables", "v", nil, "The variables to use with the provisioner's provider")
-	rootCmd.PersistentFlags().BoolVar(&watch, "watch", false, "watch for progress")
+	rootCmd.PersistentFlags().BoolVar(&watch, "watch", true, "watch for progress")
 	rootCmd.Flags().StringVarP(&address, "address", "a", ":8080", "The bind address this watcher")
 	rootCmd.Flags().StringSliceVarP(&peers, "peers", "p", nil, "The peers to connect to")
 	rootCmd.Flags().Uint64Var(&heartBeatInterval, "heartbeat-interval", 5, "The interval to send heartbeats in seconds")
