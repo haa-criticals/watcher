@@ -119,7 +119,7 @@ func (g *Gitlab) watchPipeline(ctx context.Context, pipeline *pipeline) error {
 	log.Printf("Operation Created at %v", pipeline.CreatedAt)
 	log.Printf("Start watching Operation...")
 
-	tick := time.NewTicker(time.Second * 10)
+	tick := time.NewTicker(time.Second * 30)
 	defer tick.Stop()
 	for {
 		select {
